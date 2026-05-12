@@ -102,9 +102,10 @@ Menggunakan pendekatan **UI/UX & Frontend-First**, kita memastikan seluruh tampi
    - `Koperasi`, `User`, `Anggota`
    - `ProdukSimpanan`, `RekeningSimpanan`, `MutasiSimpanan`
    - `ProdukPinjaman`, `Pinjaman`, `JadwalAngsuran`
-   - `ChartOfAccount`, `Jurnal`, `JurnalEntry` (Integritas Akuntansi)
+   - `ChartOfAccount`, `Jurnal`, `JurnalEntry` (Integritas Akuntansi Double-Entry)
+   - **`AuditLog`** — Model wajib untuk mencatat jejak seluruh transaksi dan aktivitas sistem (lihat Aturan L `architecture.md`).
 3. **Migrasi Basis Data & Penyemaian Awal (Seeding)**:
-   Siapkan pangkalan data PostgreSQL, jalankan migrasi pembentukan tabel, dan buat *seeder* (`prisma/seed.ts`) untuk mengisi akun admin utama serta daftar produk master bawaan.
+   Siapkan pangkalan data PostgreSQL, jalankan migrasi pembentukan tabel, dan buat *seeder* (`prisma/seed.ts`) untuk mengisi akun admin utama, daftar COA (*Chart of Accounts*) master, serta katalog produk bawaan.
    ```bash
    npx prisma migrate dev --name init_schema_core
    npm run seed
@@ -122,25 +123,77 @@ Menggunakan pendekatan **UI/UX & Frontend-First**, kita memastikan seluruh tampi
 ## ⚡ TAHAP 4 — Integrasi Peladen (Server Components & Actions)
 **Tujuan:** Menghidupkan tata letak antarmuka statis dari Tahap 2 dengan menyuntikkan aliran data dinamis dari Prisma (Tahap 3). **Membasmi total** semua data rekaan/tiruan.
 
+> [!IMPORTANT]
+> **ATURAN WAJIB TAHAP INI:** Setiap Server Action yang dibuat HARUS menyertakan entri `AuditLog` dalam blok `prisma.$transaction([...])` yang sama dengan operasi utamanya. Tidak boleh ada mutasi data tanpa jejak audit. Lihat Aturan L di `architecture.md`.
+
 ### Langkah-Langkah:
 1. **Penerapan Pola Pemisahan Server-Client**:
-   Ubah halaman utama (`page.tsx`) di tiap modul menjadi *Server Component* asinkron murni yang mengambil data menggunakan `await prisma.model.findMany()`.
+   Ubah halaman utama (`page.tsx`) di tiap modul menjadi *Server Component* asinkron murni yang mengambil data langsung menggunakan `await prisma.model.findMany()` tanpa melewati route API.
+
 2. **Penyaluran Opsi Dropdown Dinamis**:
    Pada modal pembukaan rekening dan pengajuan pinjaman, ambil daftar riil anggota aktif dan produk aktif dari peladen, lalu teruskan sebagai `props` ke komponen klien.
-3. **Pembuatan Server Actions**:
-   Bangun berkas aksi peladen khusus (misal: `actions/kasir.action.ts` dan `actions/pinjaman.action.ts`) untuk menangani pengiriman formulir dan mutasi saldo yang tervalidasi.
-4. **Integrasi `<FeedbackModal />`**:
-   Gantikan seluruh pesan galat atau sukses dengan memicu kemunculan modal Tabler UI yang telah disiapkan di Tahap 2, pastikan tidak ada `alert()` peramban yang tersisa.
-5. **Pengecekan Ketat TypeScript**:
-   Jalankan kompilator untuk memvalidasi tidak ada tipe `any` implisit atau properti skema yang meleset:
+
+3. **Pembuatan Server Actions (`/actions/*.ts`)**:
+   Bangun berkas aksi peladen khusus untuk setiap modul:
+   - `actions/teller.ts` — Setoran & penarikan tunai kasir.
+   - `actions/anggota.ts` — Pendaftaran dan pembaruan profil anggota.
+   - `actions/pinjaman.ts` — Pengajuan, persetujuan, dan pencairan pinjaman.
+
+   **Pola wajib setiap Server Action:**
+   ```typescript
+   "use server";
+   import { prisma } from "@/lib/prisma";
+   import { z } from "zod";
+
+   const InputSchema = z.object({ /* ... validasi Zod */ });
+
+   export async function namaAksi(input: unknown) {
+     // 1. Validasi input
+     const data = InputSchema.safeParse(input);
+     if (!data.success) return { success: false, error: data.error.flatten() };
+
+     try {
+       // 2. Eksekusi operasi utama + AuditLog dalam SATU transaksi atomik
+       await prisma.$transaction([
+         prisma.model.create({ data: { ...data.data } }),
+         prisma.auditLog.create({
+           data: {
+             userId: null, // Ganti dengan session.user.id saat auth terpasang
+             source: "TELLER", // atau "WEBHOOK" | "AI_AGENT" | "SYSTEM"
+             action: "NAMA_AKSI_UPPER_SNAKE_CASE",
+             entityType: "NAMA_ENTITAS",
+             entityId: "id-entitas",
+             details: JSON.stringify({ ...data.data }),
+           },
+         }),
+       ]);
+
+       // 3. Invalidasi cache halaman yang terpengaruh
+       revalidatePath("/dashboard/nama-modul");
+       return { success: true };
+     } catch (e) {
+       return { success: false, error: "Gagal menyimpan data. Silakan coba lagi." };
+     }
+   }
+   ```
+
+4. **Wajib: Auto-Journaling Double-Entry pada Setiap Transaksi Finansial**:
+   Setiap Server Action yang menyentuh saldo (setoran, penarikan, pencairan pinjaman, pembayaran angsuran) WAJIB memanggil `lib/automation/journaling.ts` untuk membuat entri `Jurnal` dan pasangan `JurnalEntry` (Debit & Kredit) secara otomatis dalam transaksi yang sama.
+
+5. **Integrasi `<FeedbackModal />`**:
+   Gantikan seluruh pesan galat atau sukses dengan memicu kemunculan modal Tabler UI dari Tahap 2. Tidak boleh ada `alert()` peramban yang tersisa.
+
+6. **Pengecekan Ketat TypeScript**:
+   Jalankan kompilator untuk memvalidasi tidak ada tipe `any` implisit:
    ```bash
    npx tsc --noEmit
    ```
-6. **🔒 POSPENGAMANAN GIT 4**:
+
+7. **🔒 POSPENGAMANAN GIT 4**:
    Komit hasil pengawinan *frontend* dan *backend* yang sukses berjalan:
    ```bash
    git add .
-   git commit -m "feat(integration): koneksi logika server Prisma ke UI dan pemberantasan data statis"
+   git commit -m "feat(integration): koneksi Server Actions Prisma ke UI, audit log atomik, dan pemberantasan data statis"
    git push origin main
    ```
 
