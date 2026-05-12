@@ -159,7 +159,7 @@ export default function AnggotaPage() {
             <DialogDescription className="text-xs text-slate-500">
               Gunakan pemindai KTP cerdas untuk mengekstrak data identitas secara instan.
             </DialogDescription>
-          </Header>
+          </DialogHeader>
 
           {/* Area Pemicu OCR */}
           <div className="py-2">

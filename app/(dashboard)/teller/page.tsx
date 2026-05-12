@@ -119,7 +119,7 @@ export default function TellerPage() {
             <CardDescription className="text-xs">
               Pastikan uang fisik telah dihitung sebelum menekan tombol verifikasi.
             </CardDescription>
-          </Header>
+          </CardHeader>
           <CardContent className="pt-4">
             <form onSubmit={handleProcessTransaction} className="space-y-4">
               {/* Info Terkunci */}
