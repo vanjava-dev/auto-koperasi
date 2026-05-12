@@ -11,18 +11,19 @@ import {
   CreditCard,
   PiggyBank,
   ArrowUpRight,
-  ArrowDownLeft,
   Plus,
   FileText,
   Download,
+  Cpu,
+  Clock,
+  Zap,
+  CheckCircle2,
+  RefreshCw,
+  BellRing,
 } from "lucide-react";
 import { FeedbackModal, FeedbackType } from "@/components/shared/FeedbackModal";
 
-/**
- * Halaman Dashboard Statis — Menampilkan KPI utama dan mutasi kas terakhir.
- */
 export default function DashboardPage() {
-  // State untuk demonstrasi FeedbackModal (SOP 09 Larangan alert)
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
     type: FeedbackType;
@@ -39,7 +40,22 @@ export default function DashboardPage() {
     setModalState({ isOpen: true, type, title, description });
   };
 
-  // Data tiruan transaksi terakhir
+  // State simulasi eksekusi latar belakang (Cron / Webhook trigger)
+  const [isTriggeringJob, setIsTriggeringJob] = useState<string | null>(null);
+  const [jobResultMsg, setJobResultMsg] = useState<string | null>(null);
+
+  const handleTriggerBackgroundJob = (jobName: string, label: string) => {
+    setIsTriggeringJob(jobName);
+    setJobResultMsg(null);
+
+    // Simulasi penembakan langsung ke Route Handlers /api/jobs/*
+    setTimeout(() => {
+      setIsTriggeringJob(null);
+      setJobResultMsg(`[Sukses] Tugas "${label}" berhasil dipicu dan dicatat ke dalam log audit.`);
+      showModal("success", "Pemicuan Berhasil", `Sistem telah memproses tugas latar belakang "${label}" secara terisolasi.`);
+    }, 1500);
+  };
+
   const recentTransactions = [
     { id: "TRX-001", name: "Budi Santoso", type: "Simpanan Wajib", amount: 100000, date: "12 Mei 2026", status: "success" },
     { id: "TRX-002", name: "Siti Aminah", type: "Angsuran Pinjaman", amount: 850000, date: "12 Mei 2026", status: "success" },
@@ -50,11 +66,11 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* ── Header Halaman (SOP Mobile Poin 3C) ── */}
+      {/* ── Header Halaman ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Ikhtisar Keuangan</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Pantau arus kas, simpanan, dan portofolio pembiayaan secara real-time.</p>
+          <p className="text-xs text-slate-500 mt-0.5">Pantau arus kas, simpanan, dan status integrasi AI Core secara real-time.</p>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <Button
@@ -75,9 +91,8 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── Grid Kartu Metrik (SOP Mobile Poin 3B) ── */}
+      {/* ── Grid Kartu Metrik ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Aset */}
         <Card className="border-none shadow-sm bg-white">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-xs font-semibold text-slate-500 uppercase">Total Aset Koperasi</CardTitle>
@@ -94,7 +109,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Simpanan Anggota */}
         <Card className="border-none shadow-sm bg-white">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-xs font-semibold text-slate-500 uppercase">Total Simpanan</CardTitle>
@@ -108,7 +122,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Pembiayaan Aktif */}
         <Card className="border-none shadow-sm bg-white">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-xs font-semibold text-slate-500 uppercase">Pembiayaan Berjalan</CardTitle>
@@ -124,7 +137,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Anggota Aktif */}
         <Card className="border-none shadow-sm bg-white">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-xs font-semibold text-slate-500 uppercase">Anggota Terdaftar</CardTitle>
@@ -142,7 +154,117 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* ── Area Tabel Ringkasan Transaksi (SOP Mobile Poin 3A) ── */}
+      {/* ── Panel Otomasi AI & Tugas Terjadwal (Pusat Kendali UI Dinamis) ── */}
+      <Card className="border border-slate-200/80 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white overflow-hidden shadow-xl">
+        <CardHeader className="py-4 px-6 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Cpu className="w-5 h-5 text-amber-400 animate-spin-slow" />
+            <div>
+              <CardTitle className="text-sm font-bold text-white">Pusat Kendali Otomasi AI & Cron Tasks</CardTitle>
+              <p className="text-[10px] text-slate-400">Pemantauan subsistem cerdas Tahap 5 dan penyiaran tugas latar belakang</p>
+            </div>
+          </div>
+          <Badge className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] self-start sm:self-auto">
+            5/5 Layanan Siap
+          </Badge>
+        </CardHeader>
+        <CardContent className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Status 1: Cron Kolektibilitas */}
+            <div className="p-3 bg-slate-800/60 rounded-xl border border-slate-700/60 space-y-2 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between text-xs font-bold text-slate-200">
+                  <span className="flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-blue-400" />
+                    Kolektibilitas Harian
+                  </span>
+                  <span className="text-[9px] text-emerald-400 flex items-center gap-0.5">
+                    <CheckCircle2 className="w-3 h-3" /> Aktif
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Memindai keterlambatan angsuran dan memperbarui klasifikasi OJK.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={isTriggeringJob !== null}
+                onClick={() => handleTriggerBackgroundJob("collect", "Pembaruan Kolektibilitas")}
+                className="w-full text-[10px] h-7 bg-slate-700 hover:bg-slate-600 text-white border-none mt-2"
+              >
+                {isTriggeringJob === "collect" ? <RefreshCw className="w-3 h-3 animate-spin mr-1" /> : <Zap className="w-3 h-3 mr-1 text-amber-400" />}
+                {isTriggeringJob === "collect" ? "Menyiarkan..." : "Picu Cron Sekarang"}
+              </Button>
+            </div>
+
+            {/* Status 2: Distribusi Bunga / Imbal Jasa */}
+            <div className="p-3 bg-slate-800/60 rounded-xl border border-slate-700/60 space-y-2 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between text-xs font-bold text-slate-200">
+                  <span className="flex items-center gap-1.5">
+                    <Zap className="w-3.5 h-3.5 text-amber-400" />
+                    Kran Imbal Jasa
+                  </span>
+                  <span className="text-[9px] text-emerald-400 flex items-center gap-0.5">
+                    <CheckCircle2 className="w-3 h-3" /> Akhir Bulan
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Mengkreditkan bunga simpanan dan membangkitkan jurnal ganda atomik.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={isTriggeringJob !== null}
+                onClick={() => handleTriggerBackgroundJob("interest", "Kran Distribusi Bunga")}
+                className="w-full text-[10px] h-7 bg-slate-700 hover:bg-slate-600 text-white border-none mt-2"
+              >
+                {isTriggeringJob === "interest" ? <RefreshCw className="w-3 h-3 animate-spin mr-1" /> : <Zap className="w-3 h-3 mr-1 text-amber-400" />}
+                {isTriggeringJob === "interest" ? "Menyiarkan..." : "Picu Imbal Jasa"}
+              </Button>
+            </div>
+
+            {/* Status 3: Asisten Penagihan WA */}
+            <div className="p-3 bg-slate-800/60 rounded-xl border border-slate-700/60 space-y-2 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between text-xs font-bold text-slate-200">
+                  <span className="flex items-center gap-1.5">
+                    <BellRing className="w-3.5 h-3.5 text-rose-400" />
+                    Pengingat WA Pagi
+                  </span>
+                  <span className="text-[9px] text-emerald-400 flex items-center gap-0.5">
+                    <CheckCircle2 className="w-3 h-3" /> Pukul 08:00
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Memindai tagihan H-7 dan H-1 untuk peringatan nirkontak via WhatsApp.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={isTriggeringJob !== null}
+                onClick={() => handleTriggerBackgroundJob("reminder", "Pengingat Tagihan WA")}
+                className="w-full text-[10px] h-7 bg-slate-700 hover:bg-slate-600 text-white border-none mt-2"
+              >
+                {isTriggeringJob === "reminder" ? <RefreshCw className="w-3 h-3 animate-spin mr-1" /> : <Zap className="w-3 h-3 mr-1 text-amber-400" />}
+                {isTriggeringJob === "reminder" ? "Menyiarkan..." : "Picu Pindai WA"}
+              </Button>
+            </div>
+          </div>
+
+          {jobResultMsg && (
+            <div className="mt-4 p-2.5 bg-slate-800/90 border border-slate-700 rounded-lg text-[11px] text-slate-300 font-mono flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>{jobResultMsg}</span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Area Tabel Ringkasan Transaksi ── */}
       <Card className="border-none shadow-sm overflow-hidden bg-white">
         <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100 py-4 px-6">
           <div className="flex items-center gap-2">
@@ -154,7 +276,6 @@ export default function DashboardPage() {
           </Badge>
         </CardHeader>
 
-        {/* Kewajiban Wadah overflow-x-auto untuk tabel */}
         <CardContent className="p-0 overflow-x-auto max-w-full">
           <Table className="min-w-[600px]">
             <TableHeader>
@@ -196,7 +317,6 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
 
-      {/* ── Panggilan Komponen Global Feedback Modal ── */}
       <FeedbackModal
         isOpen={modalState.isOpen}
         onClose={() => setModalState((prev) => ({ ...prev, isOpen: false }))}

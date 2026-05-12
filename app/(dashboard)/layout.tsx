@@ -4,6 +4,8 @@ import React, { useState } from "react";
 import { Sidebar } from "@/components/shared/Sidebar";
 import { Navbar } from "@/components/shared/Navbar";
 
+import { AiChatWidget } from "@/components/ai-chat-widget";
+
 /**
  * DashboardLayout — Kerangka pembungkus utama antarmuka Koperasi-AI.
  * Mengelola pergeseran bilah navigasi seluler dan dorongan wadah di desktop.
@@ -38,6 +40,9 @@ export default function DashboardLayout({
           {children}
         </main>
       </div>
+
+      {/* ── Asisten Penasihat AI Global Mengambang ── */}
+      <AiChatWidget />
     </div>
   );
 }
