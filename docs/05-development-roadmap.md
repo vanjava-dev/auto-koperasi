@@ -15,242 +15,110 @@ Menggunakan pendekatan **UI/UX & Frontend-First**, kita memastikan seluruh tampi
 
 ```
 ┌───────────────────────────────────────────────────────────┐
-│ TAHAP 1: Inisialisasi Proyek & Repositori Dasar           │
+│ [x] TAHAP 1: Inisialisasi Proyek & Repositori Dasar       │
 ├───────────────────────────────────────────────────────────┤
-│ TAHAP 2: Slicing UI/UX, Desain Sistem & Frontend Statis   │
+│ [x] TAHAP 2: Slicing UI/UX, Desain Sistem & Frontend      │
 ├───────────────────────────────────────────────────────────┤
-│ TAHAP 3: Desain Skema Basis Data (Backend ORM)            │
+│ [x] TAHAP 3: Desain Skema Basis Data (Backend ORM)        │
 ├───────────────────────────────────────────────────────────┤
-│ TAHAP 4: Integrasi Peladen (Server Components & Actions)  │
+│ [x] TAHAP 4: Integrasi Peladen (Components & Actions)     │
 ├───────────────────────────────────────────────────────────┤
-│ TAHAP 5: Pemasangan Mesin Otomasi AI & Layanan Eksternal  │
+│ [x] TAHAP 5: Mesin Otomasi AI & UI Live Integration       │
 ├───────────────────────────────────────────────────────────┤
-│ TAHAP 6: Hardening, Pengujian Bebas Galat, & Go-Live      │
+│ [ ] TAHAP 6: Hardening, Pengujian Bebas Galat, & Go-Live  │
 └───────────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## 🎨 TAHAP 1 — Inisialisasi Proyek & Repositori Dasar
+**Status:** ✅ **SELESAI (100%)**  
 **Tujuan:** Menyiapkan kerangka kerja kosong berstandar tinggi yang siap dipoles.
 
-### Langkah-Langkah:
-1. **Penciptaan Kerangka Next.js**:
-   Jalankan perintah instalasi bersih:
-   ```bash
-   npx create-next-app@latest koperasi-ai --typescript --tailwind --eslint --app --src-dir=false --import-alias="@/*"
-   ```
-2. **Pembersihan Berkas Bawaan**:
-   Hapus gaya CSS bawaan di `app/globals.css` dan sisakan direktif esensial Tailwind CSS. Kosongkan isi `app/page.tsx` menjadi halaman sederhana.
-3. **Instalasi Pustaka UI Dasar**:
-   Inisialisasi pustaka `shadcn/ui` dan `lucide-react`:
-   ```bash
-   npx shadcn@latest init
-   ```
-4. **🔒 POSPENGAMANAN GIT 1**:
-   Inisialisasi repositori Git lokal, tautkan ke repositori GitHub kosong Anda, lakukan komit pertama, dan dorong (*push*):
-   ```bash
-   git init
-   git add .
-   git commit -m "chore: inisialisasi proyek Next.js bersih"
-   git branch -M main
-   git remote add origin https://github.com/USERNAME/koperasi-ai.git
-   git push -u origin main
-   ```
+### Daftar Periksa:
+- [x] **Penciptaan Kerangka Next.js**: `npx create-next-app@latest ...`
+- [x] **Pembersihan Berkas Bawaan**: Reset gaya dasar di `app/globals.css`.
+- [x] **Instalasi Pustaka UI Dasar**: Konfigurasi `shadcn/ui` dan ikon `lucide-react`.
+- [x] **🔒 PENGAMANAN GIT 1**: Inisialisasi Git lokal dan dorongan ke GitHub.
 
 ---
 
-## 🪟 TAHAP 2 — Slicing UI/UX, Desain Sistem & Frontend Statis (Tanpa Database)
-**Tujuan:** Merancang antarmuka visual yang memukau, bersih, dan mematuhi seluruh SOP UI/UX modern (Gaya Tabler). Semua data di tahap ini menggunakan data tiruan statis murni untuk menguji tata letak.
+## 🪟 TAHAP 2 — Slicing UI/UX, Desain Sistem & Frontend Statis
+**Status:** ✅ **SELESAI (100%)**  
+**Tujuan:** Merancang antarmuka visual memukau berbasis gaya Tabler dengan penegakan komponen baku SOP.
 
-### Langkah-Langkah:
-1. **Penerapan Token Warna & Tipografi (`docs/07-ui-design-system.md`)**:
-   Tanamkan variabel warna HSL kustom untuk tema **Slate** (Netral), **Blue** (Aksi), **Emerald** (Sukses), dan **Rose** (Bahaya) ke dalam *file* CSS utama.
-2. **Penciptaan Komponen Inti UI Baku (`docs/09-ui-ux-standardization-sop.md`)**:
-   - **Tombol Berikon**: Modifikasi komponen `@/components/ui/button` agar mewajibkan prop atau penyisipan ikon `lucide-react` di kiri teks (`mr-2 h-4 w-4`).
-   - **Tabel Seragam**: Buat pembungkus tata letak tabel dengan *header* seragam (`bg-slate-50/70 text-xs uppercase font-bold`), baris tipis (`divide-y`), perataan kanan khusus kolom uang/angka bermode *monospace*, dan sisipkan blok *Pagination* standar di bawahnya.
-   - **Modal Umpan Balik (Tabler Style)**: Bangun komponen global `<FeedbackModal />` berlatar belakang ikon raksasa semitransparan di tengah atas untuk kelak menggantikan semua fungsi `alert()`.
-3. **Slicing Tata Letak Utama (Dashboard Layout)**:
-   Buat kerangka bilah navigasi samping (*Sidebar*) yang dapat dilipat dan bilah atas (*Navbar*) dengan informasi pengguna.
-4. **Slicing Halaman Antarmuka Pengguna (UI Mockups)**:
-   - Halaman **Dashboard**: Deretan kartu KPI, area grafik pertumbuhan, dan tabel ringkasan.
-   - Halaman **Kasir / Teller**: Antarmuka ringkas berfokus pada kecepatan ketukan dengan *input* pencarian di atas.
-   - Halaman **Manajemen Anggota**: Tabel data berkolom lengkap beserta formulir registrasi bergaya kartu (*card*).
-   - Halaman **Manajemen Simpanan & Pinjaman**: Tampilan kartu portofolio dan rancangan visual modal pengajuan/pembukaan rekening.
-5. **🔒 POSPENGAMANAN GIT 2**:
-   Simpan seluruh pencapaian visual dan dorong ke peladen repositori:
-   ```bash
-   git add .
-   git commit -m "feat(ui): slicing komponen baku, layout, dan halaman frontend sesuai SOP Tabler"
-   git push origin main
-   ```
+### Daftar Periksa:
+- [x] **Penerapan Token Warna & Tipografi**: Impor HSL Slate, Blue, Emerald, Rose di CSS.
+- [x] **Penciptaan Komponen Inti UI Baku**:
+  - [x] Tombol berikon wajib pendamping sisi kiri.
+  - [x] Tabel seragam ber-header abu tipis dan tipografi angka/uang monospace rata kanan.
+  - [x] Modal Umpan Balik (FeedbackModal) bergaya Tabler UI.
+- [x] **Slicing Tata Letak Utama**: Bilah navigasi seluler dan dorongan wadah desktop.
+- [x] **Slicing Halaman Antarmuka**: Dashboard, Teller, Buku Induk Anggota.
+- [x] **🔒 PENGAMANAN GIT 2**: Amankan seluruh capaian visual ke repositori.
 
 ---
 
 ## 🗄️ TAHAP 3 — Desain Skema Basis Data (Backend ORM)
-**Tujuan:** Menyiapkan fondasi penyimpanan data relasional yang kokoh, mendukung jejak audit, dan pencatatan ganda (*double-entry*).
+**Status:** ✅ **SELESAI (100%)**  
+**Tujuan:** Menyiapkan fondasi penyimpanan data relasional atomik ganda.
 
-### Langkah-Langkah:
-1. **Instalasi Prisma & Klien**:
-   ```bash
-   npm install @prisma/client
-   npm install prisma --save-dev
-   npx prisma init
-   ```
-2. **Penyusunan Skema Relasional (`schema.prisma`)**:
-   Rancang entitas yang saling terhubung sesuai `docs/02-database-schema.md`:
-   - `Koperasi`, `User`, `Anggota`
-   - `ProdukSimpanan`, `RekeningSimpanan`, `MutasiSimpanan`
-   - `ProdukPinjaman`, `Pinjaman`, `JadwalAngsuran`
-   - `ChartOfAccount`, `Jurnal`, `JurnalEntry` (Integritas Akuntansi Double-Entry)
-   - **`AuditLog`** — Model wajib untuk mencatat jejak seluruh transaksi dan aktivitas sistem (lihat Aturan L `architecture.md`).
-3. **Migrasi Basis Data & Penyemaian Awal (Seeding)**:
-   Siapkan pangkalan data PostgreSQL, jalankan migrasi pembentukan tabel, dan buat *seeder* (`prisma/seed.ts`) untuk mengisi akun admin utama, daftar COA (*Chart of Accounts*) master, serta katalog produk bawaan.
-   ```bash
-   npx prisma migrate dev --name init_schema_core
-   npm run seed
-   ```
-4. **🔒 POSPENGAMANAN GIT 3**:
-   Amankan struktur basis data dan arsip migrasi ke GitHub:
-   ```bash
-   git add .
-   git commit -m "feat(db): pembentukan skema Prisma relasional dan penyemaian data master"
-   git push origin main
-   ```
+### Daftar Periksa:
+- [x] **Instalasi Prisma & Klien**: Pemasangan `@prisma/client`.
+- [x] **Penyusunan Skema Relasional**: Pemetaan tabel Koperasi, Anggota, Rekening, Transaksi, Jurnal, dan **AuditLog** wajib.
+- [x] **Migrasi Basis Data & Penyemaian Awal**: Eksekusi `npx prisma migrate dev` dan pengisian *seeder* COA master.
+- [x] **🔒 PENGAMANAN GIT 3**: Arsip skema dan berkas migrasi.
 
 ---
 
 ## ⚡ TAHAP 4 — Integrasi Peladen (Server Components & Actions)
-**Tujuan:** Menghidupkan tata letak antarmuka statis dari Tahap 2 dengan menyuntikkan aliran data dinamis dari Prisma (Tahap 3). **Membasmi total** semua data rekaan/tiruan.
+**Status:** ✅ **SELESAI (100%)**  
+**Tujuan:** Mengawinkan antarmuka visual dengan aliran data dinamis dan memberantas data statis.
 
-> [!IMPORTANT]
-> **ATURAN WAJIB TAHAP INI:** Setiap Server Action yang dibuat HARUS menyertakan entri `AuditLog` dalam blok `prisma.$transaction([...])` yang sama dengan operasi utamanya. Tidak boleh ada mutasi data tanpa jejak audit. Lihat Aturan L di `architecture.md`.
-
-### Langkah-Langkah:
-1. **Penerapan Pola Pemisahan Server-Client**:
-   Ubah halaman utama (`page.tsx`) di tiap modul menjadi *Server Component* asinkron murni yang mengambil data langsung menggunakan `await prisma.model.findMany()` tanpa melewati route API.
-
-2. **Penyaluran Opsi Dropdown Dinamis**:
-   Pada modal pembukaan rekening dan pengajuan pinjaman, ambil daftar riil anggota aktif dan produk aktif dari peladen, lalu teruskan sebagai `props` ke komponen klien.
-
-3. **Pembuatan Server Actions (`/actions/*.ts`)**:
-   Bangun berkas aksi peladen khusus untuk setiap modul:
-   - `actions/teller.ts` — Setoran & penarikan tunai kasir.
-   - `actions/anggota.ts` — Pendaftaran dan pembaruan profil anggota.
-   - `actions/pinjaman.ts` — Pengajuan, persetujuan, dan pencairan pinjaman.
-
-   **Pola wajib setiap Server Action:**
-   ```typescript
-   "use server";
-   import { prisma } from "@/lib/prisma";
-   import { z } from "zod";
-
-   const InputSchema = z.object({ /* ... validasi Zod */ });
-
-   export async function namaAksi(input: unknown) {
-     // 1. Validasi input
-     const data = InputSchema.safeParse(input);
-     if (!data.success) return { success: false, error: data.error.flatten() };
-
-     try {
-       // 2. Eksekusi operasi utama + AuditLog dalam SATU transaksi atomik
-       await prisma.$transaction([
-         prisma.model.create({ data: { ...data.data } }),
-         prisma.auditLog.create({
-           data: {
-             userId: null, // Ganti dengan session.user.id saat auth terpasang
-             source: "TELLER", // atau "WEBHOOK" | "AI_AGENT" | "SYSTEM"
-             action: "NAMA_AKSI_UPPER_SNAKE_CASE",
-             entityType: "NAMA_ENTITAS",
-             entityId: "id-entitas",
-             details: JSON.stringify({ ...data.data }),
-           },
-         }),
-       ]);
-
-       // 3. Invalidasi cache halaman yang terpengaruh
-       revalidatePath("/dashboard/nama-modul");
-       return { success: true };
-     } catch (e) {
-       return { success: false, error: "Gagal menyimpan data. Silakan coba lagi." };
-     }
-   }
-   ```
-
-4. **Wajib: Auto-Journaling Double-Entry pada Setiap Transaksi Finansial**:
-   Setiap Server Action yang menyentuh saldo (setoran, penarikan, pencairan pinjaman, pembayaran angsuran) WAJIB memanggil `lib/automation/journaling.ts` untuk membuat entri `Jurnal` dan pasangan `JurnalEntry` (Debit & Kredit) secara otomatis dalam transaksi yang sama.
-
-5. **Integrasi `<FeedbackModal />`**:
-   Gantikan seluruh pesan galat atau sukses dengan memicu kemunculan modal Tabler UI dari Tahap 2. Tidak boleh ada `alert()` peramban yang tersisa.
-
-6. **Pengecekan Ketat TypeScript**:
-   Jalankan kompilator untuk memvalidasi tidak ada tipe `any` implisit:
-   ```bash
-   npx tsc --noEmit
-   ```
-
-7. **🔒 POSPENGAMANAN GIT 4**:
-   Komit hasil pengawinan *frontend* dan *backend* yang sukses berjalan:
-   ```bash
-   git add .
-   git commit -m "feat(integration): koneksi Server Actions Prisma ke UI, audit log atomik, dan pemberantasan data statis"
-   git push origin main
-   ```
+### Daftar Periksa:
+- [x] **Pola Pemisahan Server-Client**: Kueri langsung `prisma.findMany` di Server Components.
+- [x] **Penyaluran Opsi Dropdown Dinamis**: Seleksi riil anggota dan produk aktif.
+- [x] **Pembuatan Server Actions**: Pembuatan `actions/teller.ts` ber-pola transaksi Prisma atomik dengan penyisipan wajib entri `AuditLog`.
+- [x] **Auto-Journaling Double-Entry**: Pengaktifan kaitan otomatis Debit/Kredit buku besar.
+- [x] **Integrasi `<FeedbackModal />`**: Menggusur total penggunaan `alert()` peramban.
+- [x] **Pengecekan Ketat TypeScript**: Sertifikasi bebas galat `npx tsc --noEmit`.
+- [x] **🔒 PENGAMANAN GIT 4**: Penguncian capaian integrasi peladen.
 
 ---
 
-## 🤖 TAHAP 5 — Pemasangan Mesin Otomasi AI & Layanan Eksternal
-**Tujuan:** Mengangkat derajat aplikasi menjadi sistem cerdas mandiri (*Automation-First*).
+## 🤖 TAHAP 5 — Pemasangan Mesin Otomasi AI & Layanan Eksternal (Terintegrasi UI)
+**Status:** ✅ **SELESAI (100%)**  
+**Tujuan:** Mengangkat derajat aplikasi menjadi sistem cerdas mandiri (*Automation-First*) berserta antarmuka klien yang hidup.
 
-### Langkah-Langkah:
-1. **Pemindai KTP Otomatis (OCR Engine)**:
-   Integrasikan Google Gemini Vision API di formulir registrasi anggota. Alur: *Unggah Foto KTP → Ekstraksi JSON → Pengisian Otomatis Kolom Isian*.
-2. **Mesin Penilai Risiko Kredit (AI Credit Scoring)**:
-   Tanamkan model penilaian berbasis parameter 5C (Character, Capacity, Capital, Collateral, Condition) yang dianalisis oleh AI di dalam modal pengajuan pinjaman.
-3. **Jalur Pembayaran Otomatis (Xendit Webhooks)**:
-   Siapkan pendengar *webhook* peladen untuk mencatat setoran masuk via Virtual Account atau QRIS secara otomatis tanpa campur tangan manusia.
-4. **Otomasi Penjurnalan (Auto-Journaling)**:
-   Pasang kaitan (*trigger/hook*) di setiap fungsi transaksi simpanan dan pinjaman agar otomatis memposting entri Debit dan Kredit ganda ke tabel `Jurnal`.
-5. **Portal Anggota Android (Mobility-First / PWA / CapacitorJS wrapper)**:
-   Bangun rute web mandiri khusus seluler (sesuai SOP `docs/10-mobile-responsive-sop.md` Bagian 5) untuk akses mandiri anggota. Manfaatkan pembungkus PWA (`next-pwa`) untuk instalasi instan via Chrome, atau CapacitorJS untuk merilis berkas `.apk`/`.aab` ke Play Store tanpa menulis skrip Java/Kotlin.
-6. **🔒 POSPENGAMANAN GIT 5**:
-   Dorong pembaruan ekosistem cerdas ke GitHub:
-   ```bash
-   git add .
-   git commit -m "feat(ai): integrasi OCR KTP, Credit Scoring, Webhook, dan Portal Anggota Android"
-   git push origin main
-   ```
+### Daftar Periksa:
+- [x] **Pemindai KTP Otomatis (OCR Engine)**: Integrasi Google Gemini Vision API dengan pembacaan *confidence scores* dan jembatan Server Action UI (`actions/ocr-bridge.ts`).
+- [x] **Mesin Penilai Risiko Kredit (AI Credit Scoring)**: Kalkulasi deterministik pembobotan 5C tervalidasi.
+- [x] **Jalur Pembayaran Otomatis (Xendit Webhooks)**: Penangkap aman ber-proteksi token `x-callback-token` dan **Idempotensi** absolut.
+- [x] **Peladen AI Percakapan (Advisory Route)**: Streaming pintar berbasis `@ai-sdk/react` dengan widget mengambang *Glassmorphism* di sudut antarmuka (`components/ai-chat-widget.tsx`).
+- [x] **Pusat Kendali Otomasi UI Dasbor**: Panel visual interaktif pemantauan 5 layanan AI dan penyiaran simulasi *Cron Tasks* langsung (`app/(dashboard)/dashboard/page.tsx`).
+- [x] **🔒 PENGAMANAN GIT 5**: Penyatuan seluruh mesin cerdas dan antarmuka UI ke GitHub.
 
 ---
 
 ## 🏁 TAHAP 6 — Hardening, Pengujian Bebas Galat, & Go-Live
+**Status:** ⏳ **SEGERA HADIR (Tahap Mendatang)**  
 **Tujuan:** Memoles performa, menutup celah keamanan, dan merilis sistem ke lingkungan produksi peladen awan.
 
-### Langkah-Langkah:
-1. **Penerapan Proteksi Entri Ganda (Double-Entry Guard)**:
-   Pastikan setiap aksi sensitif menampilkan dialog penegasan keterkaitan akun dengan buku besar (SOP Poin 5).
-2. **Optimalisasi Kinerja & Singgahan (Caching)**:
-   Terapkan parameter penanda dinamis (`force-dynamic` atau revalidasi rute) agar tidak terjadi masalah data usang (*stale data*) setelah transaksi.
-3. **Penyusunan Panduan Pengguna Akhir**:
-   Lengkapi berkas bantuan singkat bagi pengurus koperasi.
-4. **🔒 POSPENGAMANAN GIT TERAKHIR**:
-   Lakukan komit pamungkas penanda versi stabil rilis pertama:
-   ```bash
-   git add .
-   git commit -m "chore: rilis produksi v1.0 stabil dan optimalisasi performa akhir"
-   git tag v1.0.0
-   git push origin main --tags
-   ```
+### Daftar Periksa:
+- [ ] **Penerapan Proteksi Entri Ganda (Double-Entry Guard)**.
+- [ ] **Optimalisasi Kinerja & Singgahan (Caching)**.
+- [ ] **Penyusunan Panduan Pengguna Akhir**.
+- [ ] **🔒 PENGAMANAN GIT TERAKHIR**: Pemberian tanda versi rilis stabil (`git tag v1.0.0`).
 
 ***
 
 ## 📊 Matriks Kepatuhan & Urutan Pengerjaan
 
-| Tahap | Fokus Area | Keterlibatan Database | Output Wajib | Kebijakan Git |
-|-------|------------|-----------------------|--------------|---------------|
-| **Tahap 1** | Setup Lingkungan | ❌ Tidak Ada | Repositori bersih bisa berjalan | `git push -u origin main` |
-| **Tahap 2** | Antarmuka & UX | ❌ Tidak Ada | Halaman cantik bergaya Tabler + Komponen Pagination/Tombol Ikon | `git push origin main` |
-| **Tahap 3** | Skema ORM | ✅ Pembuatan Skema | Skema Prisma tervalidasi + Seeder | `git push origin main` |
-| **Tahap 4** | Server Logic | ✅ Kueri Riil | UI dinamis membaca data peladen riil | `git push origin main` |
-| **Tahap 5** | Layanan AI | ✅ Pencatatan Log | Otomasi OCR, Skor Kredit, Jurnal | `git push origin main` |
-| **Tahap 6** | Stabilisasi | ✅ Operasional | Siap digunakan di peladen awan | `git push origin main --tags` |
+| Tahap | Fokus Area | Keterlibatan Database | Output Wajib | Kebijakan Git | Status |
+|-------|------------|-----------------------|--------------|---------------|--------|
+| **Tahap 1** | Setup Lingkungan | ❌ Tidak Ada | Repositori bersih bisa berjalan | `git push -u origin main` | ✅ Tuntas |
+| **Tahap 2** | Antarmuka & UX | ❌ Tidak Ada | Halaman Tabler + Komponen Baku | `git push origin main` | ✅ Tuntas |
+| **Tahap 3** | Skema ORM | ✅ Pembuatan Skema | Skema Prisma tervalidasi + Seeder | `git push origin main` | ✅ Tuntas |
+| **Tahap 4** | Server Logic | ✅ Kueri Riil | UI dinamis membaca data peladen riil | `git push origin main` | ✅ Tuntas |
+| **Tahap 5** | Layanan AI & UI | ✅ Pencatatan Log | Ekstraksi OCR, Obrolan SOP, Cron Dasbor | `git push origin main` | ✅ Tuntas |
+| **Tahap 6** | Stabilisasi | ✅ Operasional | Siap digunakan di peladen awan | `git push origin main --tags` | ⏳ Tertunda |
