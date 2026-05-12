@@ -1,0 +1,213 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* ─── Google Fonts: Inter ─────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter), 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), 'JetBrains Mono', monospace;
+  --font-heading: var(--font-inter), 'Inter', ui-sans-serif, system-ui, sans-serif;
+
+  /* ── shadcn radius tokens ── */
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+}
+
+/* ─────────────────────────────────────────────────────────── */
+/*  KOPERASI-AI COLOR TOKENS (SOP 09 — Slate / Blue / Emerald / Rose)
+/*  Brand Primary : Blue 600
+/*  Brand Dark    : Slate 900
+/*  Success       : Emerald 600
+/*  Danger        : Rose 600
+/*  Warning       : Amber 600
+/* ─────────────────────────────────────────────────────────── */
+:root {
+  /* Base background & foreground — clean white */
+  --background: oklch(0.99 0 0);
+  --foreground: oklch(0.15 0.005 250);
+
+  /* Card / Popover */
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.15 0.005 250);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.15 0.005 250);
+
+  /* Primary — Blue 600 (#2563EB) */
+  --primary: oklch(0.53 0.2 262);
+  --primary-foreground: oklch(0.99 0 0);
+
+  /* Secondary — Slate 100 */
+  --secondary: oklch(0.966 0.003 250);
+  --secondary-foreground: oklch(0.27 0.01 250);
+
+  /* Muted — Slate 50 */
+  --muted: oklch(0.982 0.002 250);
+  --muted-foreground: oklch(0.52 0.012 250);
+
+  /* Accent — Blue 50 */
+  --accent: oklch(0.97 0.01 262);
+  --accent-foreground: oklch(0.53 0.2 262);
+
+  /* Destructive — Rose 600 */
+  --destructive: oklch(0.6 0.22 15);
+
+  /* Borders & Inputs */
+  --border: oklch(0.92 0.004 250);
+  --input: oklch(0.92 0.004 250);
+  --ring: oklch(0.53 0.2 262);
+
+  /* Chart colors */
+  --chart-1: oklch(0.53 0.2 262);
+  --chart-2: oklch(0.6 0.18 152);
+  --chart-3: oklch(0.75 0.18 83);
+  --chart-4: oklch(0.6 0.22 15);
+  --chart-5: oklch(0.56 0.18 295);
+
+  --radius: 0.625rem;
+
+  /* Sidebar — Slate 900 */
+  --sidebar: oklch(0.15 0.01 250);
+  --sidebar-foreground: oklch(0.92 0.004 250);
+  --sidebar-primary: oklch(0.53 0.2 262);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.22 0.01 250);
+  --sidebar-accent-foreground: oklch(0.92 0.004 250);
+  --sidebar-border: oklch(0.25 0.01 250);
+  --sidebar-ring: oklch(0.53 0.2 262);
+}
+
+/* ─── Dark mode (reserved for future) ───────────────────── */
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.65 0.2 262);
+  --primary-foreground: oklch(0.1 0.01 250);
+  --secondary: oklch(0.27 0.01 250);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.27 0.01 250);
+  --muted-foreground: oklch(0.71 0.008 250);
+  --accent: oklch(0.27 0.01 250);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.7 0.19 22);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.56 0.2 262);
+  --sidebar: oklch(0.12 0.008 250);
+  --sidebar-foreground: oklch(0.92 0 0);
+  --sidebar-primary: oklch(0.56 0.2 262);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.2 0.01 250);
+  --sidebar-accent-foreground: oklch(0.92 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.56 0.2 262);
+}
+
+/* ─────────────────────────────────────────────────────────── */
+/*  BASE LAYER                                                 */
+/* ─────────────────────────────────────────────────────────── */
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply h-full scroll-smooth;
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  }
+  body {
+    @apply bg-background text-foreground antialiased min-h-full;
+  }
+
+  /* Headings menggunakan Inter dengan weight lebih tebal */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+  }
+
+  /* Smooth focus ring */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-primary;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────── */
+/*  KOPERASI-AI UTILITY CLASSES                                */
+/* ─────────────────────────────────────────────────────────── */
+@layer utilities {
+  /* Angka / uang — monospace, right-aligned */
+  .num-cell {
+    @apply font-mono text-sm text-right tabular-nums;
+  }
+
+  /* Tabel header standar SOP */
+  .th-standard {
+    @apply bg-slate-50/70 border-b border-slate-100 text-xs uppercase font-bold text-slate-600 tracking-wider;
+  }
+
+  /* Smooth sidebar slide */
+  .sidebar-enter {
+    transform: translateX(0);
+    transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .sidebar-exit {
+    transform: translateX(-100%);
+    transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Mobile touch target minimum 40px */
+  .touch-min {
+    @apply min-h-[40px] min-w-[40px];
+  }
+}
+
+/* ─────────────────────────────────────────────────────────── */
+/*  SCROLLBAR STYLING (Desktop)                                */
+/* ─────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: oklch(0.75 0.005 250);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: oklch(0.60 0.01 250);
+}

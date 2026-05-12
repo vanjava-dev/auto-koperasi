@@ -1,0 +1,9 @@
+Halo AI, kita akan membangun sistem Core Koperasi-AI dari nol (0) secara sekuensial. 
+
+Sebelum kamu menulis satu baris pun kode, SAYA PERINTAHKAN KAMU UNTUK MEMBACA DAN MEMAHAMI urutan serta aturan baku pada pangkalan dokumen berikut sebagai Single Source of Truth:
+1. Baca `architecture.md` untuk memahami filosofi Automation-First dan Core Coding Rules.
+2. Baca `docs/05-development-roadmap.md` untuk memahami langkah kerja sekuensial kita (UI/UX Frontend-First baru Backend DB) serta kewajiban melakukan Git Commit & Push di akhir setiap tahap.
+3. Baca `docs/09-ui-ux-standardization-sop.md` untuk menerapkan standar visual wajib: pembuatan FeedbackModal global bergaya Tabler UI (DILARANG PAKAI alert() browser!), tombol wajib berikon lucide-react, dan tabel dengan header seragam serta komponen Pagination.
+4. Baca `docs/10-mobile-responsive-sop.md` untuk pedoman pembungkus responsif mobile dan persiapan Portal Anggota Android (PWA/CapacitorJS).
+
+Jika kamu sudah membaca dan memahaminya, berikan konfirmasi singkat dan mari kita mulai eksekusi TAHAP 1 sesuai Roadmap!
