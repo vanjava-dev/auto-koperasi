@@ -37,7 +37,7 @@ export default function RootLayout({
       className={`${inter.variable} ${geistMono.variable} h-full`}
     >
       <body className="min-h-full antialiased bg-background text-foreground">
-        <TooltipProvider delayDuration={300}>
+        <TooltipProvider delay={300}>
           {children}
         </TooltipProvider>
       </body>
