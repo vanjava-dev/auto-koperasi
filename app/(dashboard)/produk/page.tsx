@@ -13,6 +13,8 @@ export default function ProdukPage() {
   const [activeTab, setActiveTab] = useState<"simpanan" | "pembiayaan">("simpanan");
   const [isOpenModal, setIsOpenModal] = useState(false);
   const [modalTitle, setModalTitle] = useState("Tambah Produk Baru");
+  const [modalMode, setModalMode] = useState<"tambah" | "edit">("tambah");
+  const [selectedId, setSelectedId] = useState("");
 
   // State Modal Umpan Balik
   const [modalState, setModalState] = useState<{
@@ -58,53 +60,99 @@ export default function ProdukPage() {
 
   const handleBukaTambah = (jenis: "simpanan" | "pembiayaan") => {
     setActiveTab(jenis);
+    setModalMode("tambah");
+    setSelectedId("");
     setModalTitle(jenis === "simpanan" ? "Tambah Produk Simpanan" : "Tambah Paket Pembiayaan");
     setFormProduk({
       kode: jenis === "simpanan" ? "SMP-BARU" : "PEM-BARU",
       nama: "",
       bungaAtauMargin: jenis === "simpanan" ? "5.0" : "12.5",
       minimalAwal: jenis === "simpanan" ? "100000" : "20000000",
-      keterangan: "",
+      keterangan: jenis === "simpanan" ? "Sukarela" : "36 Bulan",
+    });
+    setIsOpenModal(true);
+  };
+
+  const handleBukaEdit = (item: any, isSimpanan: boolean) => {
+    setModalMode("edit");
+    setSelectedId(item.id);
+    setModalTitle(isSimpanan ? "Penyuntingan Produk Simpanan" : "Penyuntingan Paket Pembiayaan");
+    setFormProduk({
+      kode: item.kode,
+      nama: item.nama,
+      bungaAtauMargin: isSimpanan ? item.bunga.toString() : item.margin.toString(),
+      minimalAwal: isSimpanan ? item.minAwal.toString() : item.maxPlafon.toString(),
+      keterangan: isSimpanan ? item.tipe : item.tenorMax,
     });
     setIsOpenModal(true);
   };
 
   const handleSimpanProduk = () => {
-    if (!formProduk.nama) {
-      showModal("warning", "Gagal Menyimpan", "Harap lengkapi nama dan kode produk terlebih dahulu.");
+    if (!formProduk.nama || !formProduk.kode) {
+      showModal("warning", "Gagal Menyimpan", "Harap lengkapi nama paket dan kode identifikasi produk terlebih dahulu.");
       return;
     }
 
-    if (activeTab === "simpanan") {
-      const newProd = {
-        id: `PRD-S0${simpananProducts.length + 1}`,
-        kode: formProduk.kode.toUpperCase(),
-        nama: formProduk.nama,
-        tipe: "Kustom",
-        bunga: Number(formProduk.bungaAtauMargin) || 0,
-        minAwal: Number(formProduk.minimalAwal) || 0,
-        status: "AKTIF",
-      };
-      setSimpananProducts([newProd, ...simpananProducts]);
-    } else {
-      const newProd = {
-        id: `PRD-P0${pembiayaanProducts.length + 1}`,
-        kode: formProduk.kode.toUpperCase(),
-        nama: formProduk.nama,
-        margin: Number(formProduk.bungaAtauMargin) || 0,
-        maxPlafon: Number(formProduk.minimalAwal) || 0,
-        tenorMax: "36 Bulan",
-        status: "AKTIF",
-      };
-      setPembiayaanProducts([newProd, ...pembiayaanProducts]);
-    }
+    if (modalMode === "tambah") {
+      if (activeTab === "simpanan") {
+        const newProd = {
+          id: `PRD-S0${simpananProducts.length + 1}`,
+          kode: formProduk.kode.toUpperCase(),
+          nama: formProduk.nama,
+          tipe: formProduk.keterangan || "Kustom",
+          bunga: Number(formProduk.bungaAtauMargin) || 0,
+          minAwal: Number(formProduk.minimalAwal) || 0,
+          status: "AKTIF",
+        };
+        setSimpananProducts([newProd, ...simpananProducts]);
+      } else {
+        const newProd = {
+          id: `PRD-P0${pembiayaanProducts.length + 1}`,
+          kode: formProduk.kode.toUpperCase(),
+          nama: formProduk.nama,
+          margin: Number(formProduk.bungaAtauMargin) || 0,
+          maxPlafon: Number(formProduk.minimalAwal) || 0,
+          tenorMax: formProduk.keterangan || "36 Bulan",
+          status: "AKTIF",
+        };
+        setPembiayaanProducts([newProd, ...pembiayaanProducts]);
+      }
 
-    setIsOpenModal(false);
-    showModal(
-      "success",
-      "Katalog Produk Berhasil Ditambahkan",
-      `Produk ${activeTab === "simpanan" ? "simpanan" : "pembiayaan"} baru "${formProduk.nama}" (${formProduk.kode.toUpperCase()}) telah diintegrasikan ke dalam rujukan master produk dengan skema penandatanganan stempel digital.`
-    );
+      setIsOpenModal(false);
+      showModal(
+        "success",
+        "Katalog Produk Berhasil Ditambahkan",
+        `Produk ${activeTab === "simpanan" ? "simpanan" : "pembiayaan"} baru "${formProduk.nama}" (${formProduk.kode.toUpperCase()}) telah diintegrasikan ke dalam rujukan master produk dengan skema penandatanganan stempel digital.`
+      );
+    } else {
+      // Alur Eksekusi Penyuntingan (Edit Mode)
+      if (activeTab === "simpanan") {
+        setSimpananProducts(prev => prev.map(p => p.id === selectedId ? {
+          ...p,
+          kode: formProduk.kode.toUpperCase(),
+          nama: formProduk.nama,
+          tipe: formProduk.keterangan || p.tipe,
+          bunga: Number(formProduk.bungaAtauMargin) || p.bunga,
+          minAwal: Number(formProduk.minimalAwal) || p.minAwal,
+        } : p));
+      } else {
+        setPembiayaanProducts(prev => prev.map(p => p.id === selectedId ? {
+          ...p,
+          kode: formProduk.kode.toUpperCase(),
+          nama: formProduk.nama,
+          margin: Number(formProduk.bungaAtauMargin) || p.margin,
+          maxPlafon: Number(formProduk.minimalAwal) || p.maxPlafon,
+          tenorMax: formProduk.keterangan || p.tenorMax,
+        } : p));
+      }
+
+      setIsOpenModal(false);
+      showModal(
+        "success",
+        "Pembaruan Portofolio Berhasil",
+        `Parameter redaksi dan ketentuan finansial pada paket "${formProduk.nama}" telah berhasil diperbarui ke dalam simpul utama.`
+      );
+    }
   };
 
   const handleHapusProduk = (id: string, nama: string) => {
@@ -113,7 +161,7 @@ export default function ProdukPage() {
     } else {
       setPembiayaanProducts(prev => prev.filter(p => p.id !== id));
     }
-    showModal("success", "Produk Dihapus", `Katalog produk "${nama}" berhasil dinonaktifkan dari sistem.`);
+    showModal("success", "Produk Diarsipkan", `Katalog produk "${nama}" berhasil dinonaktifkan dari penawaran sistem.`);
   };
 
   return (
@@ -214,6 +262,15 @@ export default function ProdukPage() {
                       <Button
                         variant="ghost"
                         size="icon"
+                        onClick={() => handleBukaEdit(row, true)}
+                        className="w-7 h-7 text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                        title="Sunting Produk"
+                      >
+                        <Edit className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={() => handleHapusProduk(row.id, row.nama)}
                         className="w-7 h-7 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
                         title="Hapus Produk"
@@ -275,6 +332,15 @@ export default function ProdukPage() {
                       <Button
                         variant="ghost"
                         size="icon"
+                        onClick={() => handleBukaEdit(row, false)}
+                        className="w-7 h-7 text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                        title="Sunting Paket"
+                      >
+                        <Edit className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={() => handleHapusProduk(row.id, row.nama)}
                         className="w-7 h-7 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
                         title="Hapus Produk"
@@ -290,13 +356,13 @@ export default function ProdukPage() {
         </Card>
       )}
 
-      {/* ── Dialog Tambah Produk ── */}
+      {/* ── Dialog Tambah / Sunting Produk ── */}
       <Dialog open={isOpenModal} onOpenChange={setIsOpenModal}>
         <DialogContent className="sm:max-w-[420px] p-6 border-none shadow-2xl">
           <DialogHeader>
             <DialogTitle className="text-base font-bold text-slate-900">{modalTitle}</DialogTitle>
             <DialogDescription className="text-xs text-slate-500">
-              Tentukan parameter margin/bunga serta batas plafon atau setoran minimal.
+              Sesuaikan margin/bunga tahunan serta plafon atas atau batas setoran minimal.
             </DialogDescription>
           </DialogHeader>
 
@@ -345,6 +411,18 @@ export default function ProdukPage() {
                 />
               </div>
             </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
+                {activeTab === "simpanan" ? "Kategori Sifat" : "Tenor Maksimal"}
+              </label>
+              <input
+                type="text"
+                placeholder={activeTab === "simpanan" ? "Sukarela / Berjangka" : "36 Bulan"}
+                value={formProduk.keterangan}
+                onChange={(e) => setFormProduk({ ...formProduk, keterangan: e.target.value })}
+                className="w-full h-8 px-3 text-xs rounded-lg border border-slate-200 text-slate-900"
+              />
+            </div>
           </div>
 
           <DialogFooter className="mt-2 gap-2">
@@ -352,7 +430,7 @@ export default function ProdukPage() {
               Batal
             </Button>
             <Button size="sm" onClick={handleSimpanProduk} className="bg-blue-600 hover:bg-blue-700 text-xs text-white h-8 font-bold shadow-md">
-              Simpan Katalog
+              {modalMode === "tambah" ? "Simpan Katalog" : "Perbarui Portofolio"}
             </Button>
           </DialogFooter>
         </DialogContent>
