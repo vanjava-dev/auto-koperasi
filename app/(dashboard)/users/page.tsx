@@ -5,12 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, UserCog, ShieldAlert, CheckCircle2, UserPlus, Lock, Key } from "lucide-react";
+import { Plus, UserCog, ShieldAlert, CheckCircle2, UserPlus, Lock, Key, Edit } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { FeedbackModal, FeedbackType } from "@/components/shared/FeedbackModal";
 
 export default function UsersPage() {
   const [isOpenModal, setIsOpenModal] = useState(false);
+  const [modalMode, setModalMode] = useState<"tambah" | "edit">("tambah");
+  const [selectedId, setSelectedId] = useState("");
 
   // State Modal Umpan Balik
   const [modalState, setModalState] = useState<{
@@ -29,7 +31,7 @@ export default function UsersPage() {
     setModalState({ isOpen: true, type, title, description });
   };
 
-  // State Formulir Pengguna Baru
+  // State Formulir Pengguna
   const [formUser, setFormUser] = useState({
     username: "",
     namaLengkap: "",
@@ -45,33 +47,78 @@ export default function UsersPage() {
     { id: "USR-004", username: "audit_eksternal", name: "KAP Tanuwijaya", role: "AUDITOR", email: "audit@tanuwijaya.com", status: "TERKUNCI", lastActive: "01 Mei 2026, 09:00" },
   ]);
 
+  const handleBukaTambah = () => {
+    setModalMode("tambah");
+    setSelectedId("");
+    setFormUser({ username: "", namaLengkap: "", role: "TELLER", email: "" });
+    setIsOpenModal(true);
+  };
+
+  const handleBukaEdit = (item: typeof userList[0]) => {
+    setModalMode("edit");
+    setSelectedId(item.id);
+    setFormUser({
+      username: item.username,
+      namaLengkap: item.name,
+      role: item.role,
+      email: item.email,
+    });
+    setIsOpenModal(true);
+  };
+
   const handleSimpanUser = () => {
     if (!formUser.username || !formUser.namaLengkap) {
       showModal("warning", "Isian Belum Lengkap", "Harap masukkan username identitas dan nama lengkap operator.");
       return;
     }
 
-    const newUser = {
-      id: `USR-00${userList.length + 1}`,
-      username: formUser.username.toLowerCase().replace(/\s+/g, "_"),
-      name: formUser.namaLengkap,
-      role: formUser.role,
-      email: formUser.email || `${formUser.username.toLowerCase()}@koperasi.id`,
-      status: "AKTIF",
-      lastActive: "Belum login",
-    };
+    const formattedUsername = formUser.username.toLowerCase().replace(/\s+/g, "_");
+    const formattedEmail = formUser.email || `${formattedUsername}@koperasi.id`;
 
-    setUserList([newUser, ...userList]);
-    setIsOpenModal(false);
+    if (modalMode === "tambah") {
+      // Cek duplikasi username
+      const exists = userList.find(u => u.username === formattedUsername);
+      if (exists) {
+        showModal("warning", "Duplikasi Username", `Username sandi "${formattedUsername}" telah terdaftar pada operator lain. Harap gunakan nama rujukan yang unik.`);
+        return;
+      }
 
-    showModal(
-      "success",
-      "Operator Berhasil Didaftarkan",
-      `Akun pengguna dengan nama sandi "${newUser.username}" telah diberikan akses peran ${newUser.role} pada tingkat arsitektur. Kredensial sementara dienkripsi otomatis.`
-    );
+      const newUser = {
+        id: `USR-00${userList.length + 1}`,
+        username: formattedUsername,
+        name: formUser.namaLengkap,
+        role: formUser.role,
+        email: formattedEmail,
+        status: "AKTIF",
+        lastActive: "Belum login",
+      };
 
-    // Reset Form
-    setFormUser({ username: "", namaLengkap: "", role: "TELLER", email: "" });
+      setUserList([newUser, ...userList]);
+      setIsOpenModal(false);
+
+      showModal(
+        "success",
+        "Operator Berhasil Didaftarkan",
+        `Akun pengguna dengan nama sandi "${newUser.username}" telah diberikan akses peran ${newUser.role} pada tingkat arsitektur. Kredensial sementara dienkripsi otomatis.`
+      );
+    } else {
+      // Alur Eksekusi Penyuntingan
+      setUserList(prev => prev.map(u => u.id === selectedId ? {
+        ...u,
+        username: formattedUsername,
+        name: formUser.namaLengkap,
+        role: formUser.role,
+        email: formattedEmail,
+      } : u));
+
+      setIsOpenModal(false);
+
+      showModal(
+        "success",
+        "Pembaruan Atribut Akun Berhasil",
+        `Redaksi nama, surel rujukan, serta hierarki akses untuk operator "${formUser.namaLengkap}" telah dimutakhirkan ke dalam basis data keamanan.`
+      );
+    }
   };
 
   const handleToggleStatus = (id: string, name: string, currentStatus: string) => {
@@ -102,7 +149,7 @@ export default function UsersPage() {
         </div>
         <Button
           size="sm"
-          onClick={() => setIsOpenModal(true)}
+          onClick={handleBukaTambah}
           className="bg-blue-600 hover:bg-blue-700 text-xs text-white h-9 shadow-md"
         >
           <UserPlus className="w-4 h-4 mr-1.5" /> Tambah Akun Operator
@@ -121,7 +168,7 @@ export default function UsersPage() {
           </Badge>
         </CardHeader>
         <CardContent className="p-0 overflow-x-auto max-w-full">
-          <Table className="min-w-[700px]">
+          <Table className="min-w-[750px]">
             <TableHeader>
               <TableRow>
                 <TableHead className="th-standard pl-6">ID</TableHead>
@@ -130,7 +177,7 @@ export default function UsersPage() {
                 <TableHead className="th-standard text-center">Tingkat Hak Akses</TableHead>
                 <TableHead className="th-standard text-center">Aktivitas Terakhir</TableHead>
                 <TableHead className="th-standard text-center">Status</TableHead>
-                <TableHead className="th-standard text-right pr-6">Pengamanan</TableHead>
+                <TableHead className="th-standard text-right pr-6">Pengamanan & Aksi</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -172,6 +219,15 @@ export default function UsersPage() {
                     <Button
                       variant="ghost"
                       size="icon"
+                      onClick={() => handleBukaEdit(row)}
+                      title="Sunting Properti Akun"
+                      className="w-7 h-7 text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                    >
+                      <Edit className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       onClick={() => handleAturUlangSandi(row.name)}
                       title="Atur Ulang Sandi"
                       className="w-7 h-7 text-slate-400 hover:text-amber-600 hover:bg-amber-50"
@@ -195,13 +251,15 @@ export default function UsersPage() {
         </CardContent>
       </Card>
 
-      {/* ── Dialog Tambah Operator ── */}
+      {/* ── Dialog Tambah / Sunting Operator ── */}
       <Dialog open={isOpenModal} onOpenChange={setIsOpenModal}>
         <DialogContent className="sm:max-w-[420px] p-6 border-none shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold text-slate-900">Pendaftaran Operator Baru</DialogTitle>
+            <DialogTitle className="text-base font-bold text-slate-900">
+              {modalMode === "tambah" ? "Pendaftaran Operator Baru" : "Penyuntingan Akun Operator"}
+            </DialogTitle>
             <DialogDescription className="text-xs text-slate-500">
-              Tentukan parameter kredensial dan batas peran otorisasi sistem.
+              Tentukan parameter kredensial dan batas otorisasi peran (*RBAC*).
             </DialogDescription>
           </DialogHeader>
 
@@ -227,7 +285,7 @@ export default function UsersPage() {
               />
             </div>
             <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Alamat Surel (Opsional)</label>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Alamat Surel Rujukan</label>
               <input
                 type="email"
                 placeholder="operator@koperasi.id"
@@ -256,7 +314,7 @@ export default function UsersPage() {
               Batal
             </Button>
             <Button size="sm" onClick={handleSimpanUser} className="bg-blue-600 hover:bg-blue-700 text-xs text-white h-8 font-bold shadow-md">
-              Daftarkan Operator
+              {modalMode === "tambah" ? "Daftarkan Operator" : "Simpan Perubahan"}
             </Button>
           </DialogFooter>
         </DialogContent>
