@@ -1,0 +1,325 @@
+// ─────────────────────────────────────────────────────────────────
+//  KOPERASI-AI — Core Relational Database Schema
+//  Mendukung Automation-First, Double-Entry Bookkeeping, dan AI Audit.
+//  Penyedia: PostgreSQL via Prisma ORM.
+// ─────────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  SUPERADMIN
+  MANAGER
+  TELLER
+}
+
+enum StatusAnggota {
+  MENUNGGU
+  AKTIF
+  NONAKTIF
+  DITOLAK
+}
+
+enum JenisSimpanan {
+  POKOK
+  WAJIB
+  SUKARELA
+  BERJANGKA
+}
+
+enum JenisMutasi {
+  SETORAN
+  PENARIKAN
+  BUNGA_BAGIHASIL
+  DENDA
+  BIAYA_ADM
+}
+
+enum StatusPinjaman {
+  PENGAJUAN
+  DISETUJUI
+  AKTIF
+  LUNAS
+  MACET
+  DITOLAK
+}
+
+enum Kolektibilitas {
+  LANCAR
+  DALAM_PERHATIAN_KHUSUS
+  KURANG_LANCAR
+  DIRAGUKAN
+  MACET
+}
+
+enum StatusJadwal {
+  BELUM_JATUH_TEMPO
+  DIBAYAR
+  TERLAMBAT
+}
+
+enum TipeAkunCoa {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+// ─── 1. ENTITAS IDENTITAS KOPERASI & USER (PETUGAS) ──────────────
+
+model Koperasi {
+  id             String   @id @default(uuid())
+  nama           String
+  badanHukumNo   String?
+  alamat         String?
+  telepon        String?
+  email          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  users          User[]
+  anggota        Anggota[]
+  produkSimpanan ProdukSimpanan[]
+  produkPinjaman ProdukPinjaman[]
+  coas           ChartOfAccount[]
+  jurnals        Jurnal[]
+
+  @@map("koperasi")
+}
+
+model User {
+  id             String   @id @default(uuid())
+  koperasiId     String
+  email          String   @unique
+  passwordHash   String
+  namaLengkap    String
+  role           Role     @default(TELLER)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  koperasi       Koperasi @relation(fields: [koperasiId], references: [id], onDelete: Cascade)
+  auditLogs      AuditLog[]
+
+  @@map("users")
+}
+
+// ─── 2. ENTITAS KEANGGOTAAN (ANGGOTA) ────────────────────────────
+
+model Anggota {
+  id             String        @id @default(uuid())
+  koperasiId     String
+  nik            String        @unique
+  namaLengkap    String
+  alamat         String?
+  tempatLahir    String?
+  tanggalLahir   DateTime?
+  noHp           String?
+  status         StatusAnggota @default(MENUNGGU)
+  joinDate       DateTime      @default(now())
+  ktpImageUrl    String?       // Jalur aset hasil OCR KTP AI
+  ocrVerified    Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  koperasi       Koperasi      @relation(fields: [koperasiId], references: [id], onDelete: Cascade)
+  rekeningSimpanan RekeningSimpanan[]
+  pinjaman       Pinjaman[]
+
+  @@map("anggota")
+}
+
+// ─── 3. ENTITAS SIMPANAN (TABUNGAN & DEPOSITO) ───────────────────
+
+model ProdukSimpanan {
+  id             String        @id @default(uuid())
+  koperasiId     String
+  namaProduk     String
+  jenis          JenisSimpanan
+  nisbahBagiHasil Decimal?     @db.Decimal(5, 2) // Persentase bunga/margin p.a
+  setoranAwalMin  Decimal      @db.Decimal(15, 2)
+  saldoMin        Decimal      @db.Decimal(15, 2) @default(0)
+  coaId           String       // Mengikat produk ke buku besar (SOP Double-Entry Guard)
+  isActive       Boolean       @default(true)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  koperasi       Koperasi      @relation(fields: [koperasiId], references: [id], onDelete: Cascade)
+  coa            ChartOfAccount @relation(fields: [coaId], references: [id])
+  rekening       RekeningSimpanan[]
+
+  @@map("produk_simpanan")
+}
+
+model RekeningSimpanan {
+  id             String        @id @default(uuid())
+  noRekening     String        @unique
+  anggotaId      String
+  produkId       String
+  saldo          Decimal       @db.Decimal(15, 2) @default(0)
+  status         String        @default("AKTIF")
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  anggota        Anggota       @relation(fields: [anggotaId], references: [id], onDelete: Cascade)
+  produk         ProdukSimpanan @relation(fields: [produkId], references: [id])
+  mutasi         MutasiSimpanan[]
+
+  @@map("rekening_simpanan")
+}
+
+model MutasiSimpanan {
+  id             String        @id @default(uuid())
+  rekeningId     String
+  jenis          JenisMutasi
+  nominal        Decimal       @db.Decimal(15, 2)
+  saldoSetelah   Decimal       @db.Decimal(15, 2)
+  keterangan     String?
+  jurnalId       String?       // Mengikat riwayat mutasi langsung ke entri Jurnal
+  referenceId    String?       @unique // Xendit reference atau ID unik transaksi
+  createdAt      DateTime      @default(now())
+
+  rekening       RekeningSimpanan @relation(fields: [rekeningId], references: [id], onDelete: Cascade)
+  jurnal         Jurnal?        @relation(fields: [jurnalId], references: [id])
+
+  @@map("mutasi_simpanan")
+}
+
+// ─── 4. ENTITAS PEMBIAYAAN (PINJAMAN & KREDIT) ───────────────────
+
+model ProdukPinjaman {
+  id             String        @id @default(uuid())
+  koperasiId     String
+  namaProduk     String
+  marginBunga    Decimal       @db.Decimal(5, 2) // Persentase flat atau efektif per bulan
+  plafonMax      Decimal       @db.Decimal(15, 2)
+  tenorMaxBulan  Int
+  coaPiutangId   String        // Akun buku besar aset piutang
+  isActive       Boolean       @default(true)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  koperasi       Koperasi      @relation(fields: [koperasiId], references: [id], onDelete: Cascade)
+  coaPiutang     ChartOfAccount @relation("CoaPiutangProduk", fields: [coaPiutangId], references: [id])
+  pinjaman       Pinjaman[]
+
+  @@map("produk_pinjaman")
+}
+
+model Pinjaman {
+  id             String        @id @default(uuid())
+  noKontrak      String        @unique
+  anggotaId      String
+  produkId       String
+  plafon         Decimal       @db.Decimal(15, 2)
+  marginBunga    Decimal       @db.Decimal(5, 2)
+  tenorBulan     Int
+  totalAngsuran  Decimal       @db.Decimal(15, 2) // Plafon + Total Bunga
+  sisaHutang     Decimal       @db.Decimal(15, 2)
+  status         StatusPinjaman @default(PENGAJUAN)
+  kolektibilitas Kolektibilitas @default(LANCAR)
+  aiCreditScore  Int?          // Rekomendasi skor otomatis dari AI
+  aiNotes        String?       @db.Text
+  approvedAt     DateTime?
+  disbursedAt    DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  anggota        Anggota       @relation(fields: [anggotaId], references: [id], onDelete: Cascade)
+  produk         ProdukPinjaman @relation(fields: [produkId], references: [id])
+  jadwalAngsuran JadwalAngsuran[]
+
+  @@map("pinjaman")
+}
+
+model JadwalAngsuran {
+  id             String        @id @default(uuid())
+  pinjamanId     String
+  angsuranKe     Int
+  jatuhTempo     DateTime
+  nominalPokok   Decimal       @db.Decimal(15, 2)
+  nominalBunga   Decimal       @db.Decimal(15, 2)
+  totalTagihan   Decimal       @db.Decimal(15, 2)
+  status         StatusJadwal  @default(BELUM_JATUH_TEMPO)
+  paidAt         DateTime?
+  referenceId    String?       @unique // ID Pembayaran Gateway
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  pinjaman       Pinjaman      @relation(fields: [pinjamanId], references: [id], onDelete: Cascade)
+
+  @@map("jadwal_angsuran")
+}
+
+// ─── 5. ENTITAS AKUNTANSI & BUKU BESAR (DOUBLE-ENTRY) ────────────
+
+model ChartOfAccount {
+  id             String        @id @default(uuid())
+  koperasiId     String
+  kodeAkun       String        // Format baku: "101.01"
+  namaAkun       String
+  tipe           TipeAkunCoa
+  isActive       Boolean       @default(true)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  koperasi       Koperasi      @relation(fields: [koperasiId], references: [id], onDelete: Cascade)
+  jurnalEntries  JurnalEntry[]
+  produkSimpanan ProdukSimpanan[]
+  produkPinjaman ProdukPinjaman[] @relation("CoaPiutangProduk")
+
+  @@unique([koperasiId, kodeAkun])
+  @@map("chart_of_accounts")
+}
+
+model Jurnal {
+  id             String        @id @default(uuid())
+  koperasiId     String
+  noReferensi    String        @unique // JRN-YYYYMMDD-XXXX
+  tanggal        DateTime      @default(now())
+  keterangan     String
+  source         String        @default("MANUAL") // "TELLER", "WEBHOOK", "AI_AGENT"
+  createdAt      DateTime      @default(now())
+
+  koperasi       Koperasi      @relation(fields: [koperasiId], references: [id], onDelete: Cascade)
+  entries        JurnalEntry[]
+  mutasiSimpanan MutasiSimpanan[]
+
+  @@map("jurnal")
+}
+
+model JurnalEntry {
+  id             String        @id @default(uuid())
+  jurnalId       String
+  coaId          String
+  debit          Decimal       @db.Decimal(15, 2) @default(0)
+  kredit         Decimal       @db.Decimal(15, 2) @default(0)
+
+  jurnal         Jurnal        @relation(fields: [jurnalId], references: [id], onDelete: Cascade)
+  coa            ChartOfAccount @relation(fields: [coaId], references: [id])
+
+  @@map("jurnal_entries")
+}
+
+// ─── 6. ENTITAS LOG AUDIT AI (AI OBSERVABILITY) ──────────────────
+
+model AuditLog {
+  id             String        @id @default(uuid())
+  userId         String?
+  source         String        @default("AI_AGENT") // Wajib untuk pencatatan agen kecerdasan buatan
+  action         String
+  entityType     String        // "ANGGOTA", "PINJAMAN", "JURNAL"
+  entityId       String
+  details        String        @db.Text
+  createdAt      DateTime      @default(now())
+
+  user           User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("audit_logs")
+}

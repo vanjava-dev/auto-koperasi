@@ -1,0 +1,21 @@
+import { PrismaClient } from "@prisma/client";
+
+// Mencegah instansiasi berulang Prisma Client saat Next.js melakukan hot-reloading di mode development
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
+};
+
+/**
+ * Prisma Client terpusat berkinerja tinggi.
+ * Siap melayani pemanggilan langsung di Server Components dan Server Actions.
+ */
+export const prisma =
+  globalForPrisma.prisma ??
+  new PrismaClient({
+    datasourceUrl: process.env.DATABASE_URL,
+    log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
+  });
+
+if (process.env.NODE_ENV !== "production") {
+  globalForPrisma.prisma = prisma;
+}
