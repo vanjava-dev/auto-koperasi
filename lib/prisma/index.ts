@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from ".prisma/client";
 
 // Mencegah instansiasi berulang Prisma Client saat Next.js melakukan hot-reloading di mode development
 const globalForPrisma = globalThis as unknown as {
