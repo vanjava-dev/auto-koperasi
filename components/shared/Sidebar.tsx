@@ -17,6 +17,9 @@ import {
   ShieldCheck,
   Building,
   TrendingUp,
+  Package,
+  UserCog,
+  MapPin,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getPengaturanSistemAction } from "@/actions/pengaturan-action";
@@ -38,6 +41,9 @@ export function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
     simpananCount: 4,
     pinjamanCount: 5,
     auditLogCount: "Live",
+    produkCount: 8,
+    userCount: 3,
+    cabangCount: 2,
   });
 
   // Tarik nama koperasi riil dari pangkalan data peladen
@@ -70,6 +76,27 @@ export function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
       badgeColor: "bg-amber-500/20 text-amber-400 border border-amber-500/30" 
     },
     { name: "Laporan Akuntansi & SHU", href: "/laporan", icon: TrendingUp },
+    { 
+      name: "Pengaturan Produk", 
+      href: "/produk", 
+      icon: Package,
+      badge: liveIndicators.produkCount,
+      badgeColor: "bg-purple-500/20 text-purple-400 border border-purple-500/30"
+    },
+    { 
+      name: "Manajemen User", 
+      href: "/users", 
+      icon: UserCog,
+      badge: liveIndicators.userCount,
+      badgeColor: "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+    },
+    { 
+      name: "Manajemen Cabang", 
+      href: "/cabang", 
+      icon: MapPin,
+      badge: liveIndicators.cabangCount,
+      badgeColor: "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+    },
     { 
       name: "Pengaturan & Audit Trail", 
       href: "/pengaturan", 
@@ -153,7 +180,7 @@ export function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
                 </div>
                 {link.badge && (
                   <span className={cn(
-                    "text-[9px] px-1.5 py-0.5 rounded-md font-bold font-mono",
+                    "text-[9px] px-1.5 py-0.5 rounded-md font-bold font-mono shrink-0",
                     link.badgeColor || "bg-blue-500/20 text-blue-300 border border-blue-500/30",
                     isActive && "bg-white/20 text-white border-transparent"
                   )}>
