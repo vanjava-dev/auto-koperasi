@@ -5,12 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, MapPin, Building2, Phone, CheckCircle2, ShieldCheck, Server } from "lucide-react";
+import { Plus, MapPin, Building2, Phone, CheckCircle2, ShieldCheck, Server, Edit } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { FeedbackModal, FeedbackType } from "@/components/shared/FeedbackModal";
 
 export default function CabangPage() {
   const [isOpenModal, setIsOpenModal] = useState(false);
+  const [modalMode, setModalMode] = useState<"tambah" | "edit">("tambah");
+  const [selectedId, setSelectedId] = useState("");
 
   // State Modal Umpan Balik
   const [modalState, setModalState] = useState<{
@@ -44,34 +46,83 @@ export default function CabangPage() {
     { id: "BRN-002", kode: "CAB-JABAR", nama: "Cabang Pembantu Bandung Raya", alamat: "Jl. Asia Afrika No. 88, Bandung", telepon: "022-4431920", aset: 200200000, status: "TERKONEKSI", isUtama: false },
   ]);
 
+  const handleBukaTambah = () => {
+    setModalMode("tambah");
+    setSelectedId("");
+    setFormCabang({
+      kode: "CAB-",
+      nama: "",
+      alamat: "",
+      telepon: "",
+      kapasitasServer: "Dedicated Node (Sinkronisasi Otomatis)",
+    });
+    setIsOpenModal(true);
+  };
+
+  const handleBukaEdit = (item: typeof cabangList[0]) => {
+    setModalMode("edit");
+    setSelectedId(item.id);
+    setFormCabang({
+      kode: item.kode,
+      nama: item.nama,
+      alamat: item.alamat,
+      telepon: item.telepon,
+      kapasitasServer: "Dedicated Node",
+    });
+    setIsOpenModal(true);
+  };
+
   const handleSimpanCabang = () => {
     if (!formCabang.nama || formCabang.kode === "CAB-") {
-      showModal("warning", "Gagal Menyimpan", "Harap masukkan nama kantor dan kode unik cabang.");
+      showModal("warning", "Gagal Menyimpan", "Harap masukkan nama kantor dan kode unik identifikasi cabang.");
       return;
     }
 
-    const newBranch = {
-      id: `BRN-00${cabangList.length + 1}`,
-      kode: formCabang.kode.toUpperCase(),
-      nama: formCabang.nama,
-      alamat: formCabang.alamat || "Alamat belum dilengkapi",
-      telepon: formCabang.telepon || "-",
-      aset: 50000000, // Alokasi awal
-      status: "TERKONEKSI",
-      isUtama: false,
-    };
+    if (modalMode === "tambah") {
+      // Cek duplikasi kode cabang
+      const exists = cabangList.find(c => c.kode === formCabang.kode.toUpperCase());
+      if (exists) {
+        showModal("warning", "Duplikasi Kode Cabang", `Simpul dengan identitas "${formCabang.kode.toUpperCase()}" telah dipetakan pada "${exists.nama}". Gunakan sandi rujukan lain.`);
+        return;
+      }
 
-    setCabangList([...cabangList, newBranch]);
-    setIsOpenModal(false);
+      const newBranch = {
+        id: `BRN-00${cabangList.length + 1}`,
+        kode: formCabang.kode.toUpperCase(),
+        nama: formCabang.nama,
+        alamat: formCabang.alamat || "Alamat belum dilengkapi",
+        telepon: formCabang.telepon || "-",
+        aset: 50000000, // Alokasi kas awal
+        status: "TERKONEKSI",
+        isUtama: false,
+      };
 
-    showModal(
-      "success",
-      "Titik Layanan Cabang Berhasil Dibuka",
-      `Kantor cabang baru "${newBranch.nama}" (${newBranch.kode}) telah berhasil didaftarkan ke dalam topologi jaringan terpusat. Node peladen mandiri otomatis diinisialisasi untuk sinkronisasi jurnal ganda waktu nyata.`
-    );
+      setCabangList([...cabangList, newBranch]);
+      setIsOpenModal(false);
 
-    // Reset
-    setFormCabang({ kode: "CAB-", nama: "", alamat: "", telepon: "", kapasitasServer: "Dedicated Node" });
+      showModal(
+        "success",
+        "Titik Layanan Cabang Berhasil Dibuka",
+        `Kantor cabang baru "${newBranch.nama}" (${newBranch.kode}) telah berhasil didaftarkan ke dalam topologi jaringan terpusat. Node peladen mandiri otomatis diinisialisasi untuk sinkronisasi jurnal ganda waktu nyata.`
+      );
+    } else {
+      // Alur Eksekusi Penyuntingan
+      setCabangList(prev => prev.map(c => c.id === selectedId ? {
+        ...c,
+        kode: formCabang.kode.toUpperCase(),
+        nama: formCabang.nama,
+        alamat: formCabang.alamat || "Alamat belum dilengkapi",
+        telepon: formCabang.telepon || "-",
+      } : c));
+
+      setIsOpenModal(false);
+
+      showModal(
+        "success",
+        "Pembaruan Kantor Cabang Berhasil",
+        `Parameter redaksi dan titik pemetaan untuk node "${formCabang.nama}" telah dimutakhirkan ke dalam topologi basis data terpusat.`
+      );
+    }
   };
 
   const handleSinkronisasiNode = (nama: string) => {
@@ -92,7 +143,7 @@ export default function CabangPage() {
         </div>
         <Button
           size="sm"
-          onClick={() => setIsOpenModal(true)}
+          onClick={handleBukaTambah}
           className="bg-rose-600 hover:bg-rose-700 text-xs text-white h-9 shadow-md"
         >
           <Plus className="w-4 h-4 mr-1.5" /> Buka Kantor Cabang
@@ -111,7 +162,7 @@ export default function CabangPage() {
           </Badge>
         </CardHeader>
         <CardContent className="p-0 overflow-x-auto max-w-full">
-          <Table className="min-w-[700px]">
+          <Table className="min-w-[750px]">
             <TableHeader>
               <TableRow>
                 <TableHead className="th-standard pl-6">Kode Jaringan</TableHead>
@@ -119,7 +170,7 @@ export default function CabangPage() {
                 <TableHead className="th-standard">Alamat & Kontak</TableHead>
                 <TableHead className="th-standard text-right">Alokasi Aset Kas</TableHead>
                 <TableHead className="th-standard text-center">Status Simpul</TableHead>
-                <TableHead className="th-standard text-right pr-6">Tindakan</TableHead>
+                <TableHead className="th-standard text-right pr-6">Tindakan Operasional</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -148,12 +199,21 @@ export default function CabangPage() {
                       <Server className="w-2.5 h-2.5" /> {row.status}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right pr-6 space-x-1">
+                  <TableCell className="text-right pr-6 space-x-1 whitespace-nowrap">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleBukaEdit(row)}
+                      title="Sunting Informasi Kantor Cabang"
+                      className="w-7 h-7 text-slate-400 hover:text-rose-600 hover:bg-rose-50 align-middle"
+                    >
+                      <Edit className="w-3.5 h-3.5" />
+                    </Button>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => handleSinkronisasiNode(row.nama)}
-                      className="text-[10px] text-blue-600 hover:bg-blue-50 font-bold"
+                      className="text-[10px] text-blue-600 hover:bg-blue-50 font-bold align-middle"
                     >
                       Sinkronisasi DB
                     </Button>
@@ -165,13 +225,15 @@ export default function CabangPage() {
         </CardContent>
       </Card>
 
-      {/* ── Dialog Tambah Cabang ── */}
+      {/* ── Dialog Tambah / Sunting Cabang ── */}
       <Dialog open={isOpenModal} onOpenChange={setIsOpenModal}>
         <DialogContent className="sm:max-w-[420px] p-6 border-none shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold text-slate-900">Pendaftaran Kantor Cabang Baru</DialogTitle>
+            <DialogTitle className="text-base font-bold text-slate-900">
+              {modalMode === "tambah" ? "Pendaftaran Kantor Cabang Baru" : "Penyuntingan Simpul Cabang"}
+            </DialogTitle>
             <DialogDescription className="text-xs text-slate-500">
-              Tentukan parameter simpul jaringan dan lokasi operasional fisik pembantu.
+              Tentukan parameter simpul jaringan dan penempatan rute peladen operasional fisik.
             </DialogDescription>
           </DialogHeader>
 
@@ -223,7 +285,7 @@ export default function CabangPage() {
               Batal
             </Button>
             <Button size="sm" onClick={handleSimpanCabang} className="bg-rose-600 hover:bg-rose-700 text-xs text-white h-8 font-bold shadow-md">
-              Buka Titik Simpul
+              {modalMode === "tambah" ? "Buka Titik Simpul" : "Simpan Perubahan"}
             </Button>
           </DialogFooter>
         </DialogContent>
