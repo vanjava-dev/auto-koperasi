@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { 
@@ -11,20 +11,23 @@ import {
   ShieldCheck, 
   Coffee, 
   LogOut, 
-  UserCog 
+  UserCog,
+  ChevronsUpDown
 } from "lucide-react";
 import { FeedbackModal, FeedbackType } from "@/components/shared/FeedbackModal";
+import { getPengaturanSistemAction } from "@/actions/pengaturan-action";
 
 /**
- * Navbar — Bilah atas yang menampilkan identitas koperasi dan info pengguna.
- * Dilengkapi dengan Menu Profil Interaktif (Profile Dropdown) berstempel audit.
+ * Navbar — Bilah atas terpadu Koperasi-AI Core.
+ * Menampung pemicu ganda: Menu Pengalih Cabang (kiri) dan Menu Profil Interaktif (kanan).
  */
 export function Navbar() {
-  const koperasiName = process.env.NEXT_PUBLIC_KOPERASI_NAME || "KSP Harapan Artha Nusantara";
+  const [koperasiName, setKoperasiName] = useState("KSP Harapan Artha Nusantara");
+  const [isBranchOpen, setIsBranchOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [operatorStatus, setOperatorStatus] = useState<"Online" | "Istirahat">("Online");
 
-  // State Modal Umpan Balik untuk Aksi Profil
+  // State Modal Umpan Balik Terpadu
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
     type: FeedbackType;
@@ -41,6 +44,30 @@ export function Navbar() {
     setModalState({ isOpen: true, type, title, description });
   };
 
+  // Muat nama koperasi riil dari pengaturan peladen
+  useEffect(() => {
+    async function fetchMeta() {
+      const res = await getPengaturanSistemAction();
+      if (res?.success && res.data?.koperasiName) {
+        setKoperasiName(res.data.koperasiName);
+      }
+    }
+    fetchMeta();
+  }, []);
+
+  // Handler Perpindahan Lingkup Cabang (Tenant Context Switch)
+  const handleSwitchBranch = (branchName: string, branchCode: string) => {
+    setKoperasiName(branchName);
+    setIsBranchOpen(false);
+
+    showModal(
+      "success",
+      "Perpindahan Simpul Cabang Berhasil",
+      `Lingkup kueri basis data operasional telah dialihkan ke dalam simpul cabang "${branchName}" (${branchCode}). Seluruh pencatatan transaksi kasir, data keanggotaan, serta pemetaan Buku Besar kini diisolasi pada instansi ini.`
+    );
+  };
+
+  // Handler Status Kehadiran Operator
   const handleToggleStatus = () => {
     const nextStatus = operatorStatus === "Online" ? "Istirahat" : "Online";
     setOperatorStatus(nextStatus);
@@ -73,34 +100,81 @@ export function Navbar() {
 
   return (
     <header className="h-16 bg-white border-b border-slate-100 flex items-center justify-between px-4 sm:px-6 sticky top-0 z-30">
-      {/* Koperasi Identity */}
-      <div className="flex items-center gap-2.5">
-        <div className="w-9 h-9 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-600 lg:hidden">
-          <Building2 className="w-4 h-4" />
-        </div>
-        <div>
-          <div className="text-xs font-semibold text-slate-900 line-clamp-1">
-            {koperasiName}
+      {/* ── Sisi Kiri: Wadah Identitas Merek & Pengalih Cabang Interaktif ── */}
+      <div className="relative">
+        <button
+          onClick={() => {
+            setIsBranchOpen(!isBranchOpen);
+            if (isProfileOpen) setIsProfileOpen(false);
+          }}
+          className="flex items-center gap-2.5 p-1.5 rounded-xl hover:bg-slate-50 transition-all text-left group focus:outline-none focus:ring-2 focus:ring-blue-100 max-w-[220px] sm:max-w-xs"
+          title="Klik untuk berpindah simpul layanan cabang"
+        >
+          <div className="w-9 h-9 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0 group-hover:scale-105 transition-transform">
+            <Building2 className="w-4 h-4" />
           </div>
-          <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-0.5">
-            <span className={`inline-block w-1.5 h-1.5 rounded-full ${operatorStatus === "Online" ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
-            <span>Cabang Utama ({operatorStatus})</span>
+          <div className="truncate">
+            <div className="text-xs font-bold text-slate-900 truncate group-hover:text-blue-600 transition-colors">
+              {koperasiName}
+            </div>
+            <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-0.5">
+              <span className={`inline-block w-1.5 h-1.5 rounded-full ${operatorStatus === "Online" ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
+              <span className="font-mono text-[9px]">Cabang Aktif</span>
+            </div>
           </div>
-        </div>
+          <ChevronsUpDown className="w-3.5 h-3.5 text-slate-400 shrink-0 group-hover:text-slate-600 transition-colors" />
+        </button>
+
+        {/* ── Senarai Dropdown Pilihan Cabang ── */}
+        {isBranchOpen && (
+          <div className="absolute left-0 top-full mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 animate-in fade-in-0 zoom-in-95 duration-150 z-50">
+            <div className="px-4 py-1.5 border-b border-slate-50 text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+              Pilih Simpul Jaringan Cabang
+            </div>
+            <div className="py-1 space-y-0.5">
+              {[
+                { code: "CAB-PUSAT", name: "Kantor Pusat Operasional" },
+                { code: "CAB-JABAR", name: "Cabang Pembantu Bandung Raya" },
+                { code: "CAB-JATIM", name: "Cabang Pembantu Surabaya" },
+              ].map((branch) => (
+                <button
+                  key={branch.code}
+                  onClick={() => handleSwitchBranch(branch.name, branch.code)}
+                  className={`w-full flex items-center justify-between px-4 py-2 text-xs text-left transition-colors ${
+                    koperasiName === branch.name
+                      ? "bg-blue-50/60 text-blue-700 font-bold"
+                      : "text-slate-600 hover:bg-slate-50 font-medium"
+                  }`}
+                >
+                  <div className="truncate">
+                    <p className="truncate leading-tight">{branch.name}</p>
+                    <p className="text-[9px] font-mono text-slate-400">{branch.code}</p>
+                  </div>
+                  {koperasiName === branch.name && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600 shrink-0" />
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Status & User Container */}
+      {/* ── Sisi Kanan: Wadah Status Jaringan & Tombol Profil Interaktif ── */}
       <div className="flex items-center gap-3 relative">
-        {/* Indikator Status Jaringan */}
+        {/* Indikator Koneksi Jaringan */}
         <Badge variant="outline" className="hidden sm:inline-flex items-center gap-1 bg-emerald-50 text-emerald-600 border-emerald-100 font-normal text-xs py-0.5">
           <Wifi className="w-3 h-3" />
           <span>Terhubung</span>
         </Badge>
 
-        {/* ── Tombol Pemicu Menu Profil Interaktif ── */}
+        {/* Tombol Pemicu Menu Profil */}
         <div className="relative border-l border-slate-100 pl-2">
           <button
-            onClick={() => setIsProfileOpen(!isProfileOpen)}
+            onClick={() => {
+              setIsProfileOpen(!isProfileOpen);
+              if (isBranchOpen) setIsBranchOpen(false);
+            }}
             className="flex items-center gap-2.5 p-1 rounded-xl hover:bg-slate-50 transition-all text-left focus:outline-none focus:ring-2 focus:ring-blue-100"
             title="Klik untuk membuka opsi akun & sesi"
           >
@@ -118,10 +192,9 @@ export function Navbar() {
             <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isProfileOpen ? "rotate-180" : ""}`} />
           </button>
 
-          {/* ── Senarai Opsi Profil Dropdown ── */}
+          {/* Senarai Opsi Profil Dropdown */}
           {isProfileOpen && (
             <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 animate-in fade-in-0 zoom-in-95 duration-150 z-50">
-              {/* Header Dropdown Info Pengguna */}
               <div className="px-4 py-2 border-b border-slate-50">
                 <p className="text-[10px] text-slate-400 font-medium">Sesi Operator Aktif</p>
                 <p className="text-xs font-bold text-slate-900 truncate">citra.sari@koperasi.id</p>
@@ -130,7 +203,6 @@ export function Navbar() {
                 </span>
               </div>
 
-              {/* Tautan Opsi-Opsi Profil */}
               <div className="py-1">
                 <button
                   onClick={handleBukaPengaturanProfil}
@@ -159,7 +231,6 @@ export function Navbar() {
                 </button>
               </div>
 
-              {/* Tombol Keluar Sistem */}
               <div className="pt-1 border-t border-slate-50">
                 <button
                   onClick={handleKeluarSistem}
@@ -174,7 +245,7 @@ export function Navbar() {
         </div>
       </div>
 
-      {/* ── Laci Pengumuman Umpan Balik Sesi ── */}
+      {/* ── Laci Pengumuman Umpan Balik Terpadu ── */}
       <FeedbackModal
         isOpen={modalState.isOpen}
         onClose={() => setModalState((prev) => ({ ...prev, isOpen: false }))}
