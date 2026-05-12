@@ -1,5 +1,5 @@
-# 🔐 Security & Compliance Guide
-# Core Koperasi — Panduan Keamanan & Kepatuhan
+﻿# ðŸ” Security & Compliance Guide
+# Core Koperasi â€” Panduan Keamanan & Kepatuhan
 
 ---
 
@@ -10,7 +10,7 @@
 - Simpan refresh token di **HttpOnly Cookie** (bukan localStorage)
 - Session timeout otomatis setelah 30 menit inaktif
 - Multi-device session management (bisa lihat & paksa logout sesi lain)
-- Implementasi **rate limiting** pada endpoint login: maks 5 percobaan gagal → lock 15 menit
+- Implementasi **rate limiting** pada endpoint login: maks 5 percobaan gagal â†’ lock 15 menit
 
 ### 1.2 Authorization (RBAC)
 Setiap endpoint dan Server Action WAJIB memvalidasi izin berdasarkan role:
@@ -34,10 +34,10 @@ export async function checkPermission(
 | Keanggotaan | CRUD | CRUD | R | R | R (sendiri) |
 | Simpanan | CRUD | CRUD | CR | R | R (sendiri) |
 | Pinjaman | CRUD | CRUD | CR | R | R (sendiri) |
-| Akuntansi | CRUD | RU | — | R | — |
-| Laporan | CRUD | R | — | R | — |
-| Pengguna | CRUD | R | — | — | — |
-| Pengaturan | CRUD | R | — | — | — |
+| Akuntansi | CRUD | RU | â€” | R | â€” |
+| Laporan | CRUD | R | â€” | R | â€” |
+| Pengguna | CRUD | R | â€” | â€” | â€” |
+| Pengaturan | CRUD | R | â€” | â€” | â€” |
 
 *C=Create, R=Read, U=Update, D=Delete*
 
@@ -47,7 +47,7 @@ export async function checkPermission(
 
 ### 2.1 Enkripsi
 - **Data at rest:** Database di-encrypt (PostgreSQL Transparent Data Encryption)
-- **Data in transit:** HTTPS wajib (TLS 1.2+), redirect HTTP → HTTPS
+- **Data in transit:** HTTPS wajib (TLS 1.2+), redirect HTTP â†’ HTTPS
 - **Password:** Hash menggunakan **bcrypt** (cost factor 12)
 - **Data sensitif:** NIK, No. HP di-mask pada tampilan (kecuali yang berwenang)
 
@@ -68,7 +68,10 @@ export async function checkPermission(
 ## 3. Audit & Compliance
 
 ### 3.1 Audit Trail
-Setiap aksi berikut WAJIB dicatat di `audit_log`:
+
+> ⚠️ **Lihat juga Aturan L di `architecture.md`** — Semua agen AI dan programmer WAJIB mengikuti pola implementasi atomik yang dijelaskan di sana. Bagian ini adalah daftar cakupan dan format standardnya.
+
+Setiap aksi berikut WAJIB dicatat di `audit_log` **dalam satu transaksi Prisma yang sama dengan operasi utamanya** (atomik):
 - Login / Logout / Login gagal
 - Create, Update, Delete data anggota
 - Semua transaksi simpanan dan pinjaman
@@ -173,3 +176,4 @@ const securityHeaders = [
 4. Verifikasi integritas data
 5. Uji transaksi sampel
 6. Notifikasi pengguna
+

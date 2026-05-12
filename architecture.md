@@ -123,3 +123,60 @@ Ketika diminta membangun atau memodifikasi antarmuka visual/komponen, AI Agent *
    - Komponen tabel dengan banyak kolom wajib dibungkus wadah `overflow-x-auto` berbasis usap horizontal (*horizontal swipe*).
    - Area ketuk tombol seluler minimal setinggi `40px` untuk kenyamanan mobilitas.
    - Pahami bahwa Koperasi-AI memiliki subsistem Portal Anggota Android berbasis PWA/CapacitorJS di mana AI Agent bertugas merakit 95% otomatisasi konfigurasinya.
+
+### L. Mandatory Audit Logging — Wajib Audit Log (ATURAN KERAS)
+
+> ⚠️ **ATURAN MUTLAK TIDAK DAPAT DIKECUALIKAN:** Setiap operasi yang mengubah, membuat, atau menghapus data **HARUS** menyisipkan satu entri ke dalam tabel `audit_log` dalam transaksi basis data yang sama. **Tidak ada pengecualian.**
+
+**Cakupan wajib — semua aksi berikut WAJIB dicatat:**
+
+| Kategori | Aksi yang Dicatat |
+|---|---|
+| **Otentikasi** | Login berhasil, Login gagal, Logout, Perubahan kata sandi |
+| **Keanggotaan** | Pendaftaran, Verifikasi, Perubahan status, Update profil |
+| **Transaksi Simpanan** | Setiap setoran & penarikan (manual maupun via webhook) |
+| **Transaksi Pinjaman** | Pengajuan, Persetujuan, Penolakan, Pencairan, Pembayaran angsuran |
+| **Jurnal Akuntansi** | Setiap pembuatan & koreksi entri jurnal |
+| **Produk & Konfigurasi** | Create/Update/Delete produk simpanan & pinjaman |
+| **Ekspor Data** | Setiap export laporan ke PDF/Excel |
+| **Aksi AI Agent** | Setiap tindakan otonom yang menyentuh data finansial |
+
+**Pola implementasi wajib di setiap Server Action:**
+
+```typescript
+// ✅ BENAR — Audit log disisipkan dalam satu transaksi Prisma yang atomik
+await prisma.$transaction([
+  // 1. Operasi utama terlebih dahulu
+  prisma.mutasiSimpanan.create({ data: { ... } }),
+
+  // 2. Audit log wajib dalam blok transaksi yang sama
+  prisma.auditLog.create({
+    data: {
+      userId: session.user.id,          // ID petugas / null jika sistem
+      source: "TELLER",                 // "TELLER" | "WEBHOOK" | "AI_AGENT" | "SYSTEM"
+      action: "SETORAN_SIMPANAN",       // Nama aksi dalam UPPER_SNAKE_CASE
+      entityType: "REKENING_SIMPANAN",  // Nama entitas yang terpengaruh
+      entityId: rekening.id,            // ID entitas yang diubah
+      details: JSON.stringify({         // Payload sebelum & sesudah perubahan
+        nominalSebelum: rekening.saldo,
+        nominalSesudah: saldoBaru,
+        keterangan: input.keterangan,
+      }),
+    },
+  }),
+]);
+
+// ❌ SALAH — Transaksi tanpa audit log. Kode ini DILARANG.
+await prisma.mutasiSimpanan.create({ data: { ... } });
+```
+
+**Properti wajib pada setiap entri `audit_log`:**
+
+| Properti | Tipe | Keterangan |
+|---|---|---|
+| `userId` | `String?` | ID pengguna yang melakukan aksi. `null` jika dipicu sistem otomatis. |
+| `source` | `String` | `"TELLER"`, `"WEBHOOK"`, `"AI_AGENT"`, `"CRON"`, atau `"SYSTEM"`. |
+| `action` | `String` | Nama aksi dalam format `UPPER_SNAKE_CASE`. Contoh: `SETORAN_SIMPANAN`. |
+| `entityType` | `String` | Nama entitas terpengaruh. Contoh: `ANGGOTA`, `PINJAMAN`, `JURNAL`. |
+| `entityId` | `String` | UUID entitas yang dimodifikasi. |
+| `details` | `String (JSON)` | Snapshot data relevan (sebelum & sesudah). **Jangan simpan password, token, atau secret.** |
