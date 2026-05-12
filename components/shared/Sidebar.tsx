@@ -20,6 +20,7 @@ import {
   MapPin,
   ChevronDown,
   ChevronRight,
+  BookOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getPengaturanSistemAction } from "@/actions/pengaturan-action";
@@ -44,6 +45,7 @@ export function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
     produkCount: 8,
     userCount: 3,
     cabangCount: 2,
+    coaCount: 12,
   });
 
   // State untuk melacak grup mana yang dalam kondisi Expand (Terbuka) / Collapse (Tertutup)
@@ -77,60 +79,67 @@ export function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
       name: "Layanan Utama",
       items: [
         { name: "Dashboard Utama", href: "/dashboard", icon: LayoutDashboard },
-        { name: "Kasir / Teller", href: "/teller", icon: Coins },
-        { name: "Keanggotaan & OCR", href: "/anggota", icon: Users },
+        { name: "Teller", href: "/teller", icon: Coins },
+        { name: "Keanggotaan", href: "/anggota", icon: Users },
       ],
     },
     {
       name: "Keuangan & Laporan",
       items: [
-        { 
-          name: "Rekening Simpanan", 
-          href: "/simpanan", 
+        {
+          name: "Rekening Simpanan",
+          href: "/simpanan",
           icon: WalletCards,
-          badge: liveIndicators.simpananCount 
+          badge: liveIndicators.simpananCount
         },
-        { 
-          name: "Kredit & Pinjaman AI", 
-          href: "/pinjaman", 
+        {
+          name: "Pinjaman",
+          href: "/pinjaman",
           icon: CreditCard,
           badge: liveIndicators.pinjamanCount,
-          badgeColor: "bg-amber-500/20 text-amber-400 border border-amber-500/30" 
+          badgeColor: "bg-amber-500/20 text-amber-400 border border-amber-500/30"
         },
-        { 
-          name: "Laporan Akuntansi & SHU", 
-          href: "/laporan", 
-          icon: TrendingUp 
+        {
+          name: "Manajemen CoA",
+          href: "/coa",
+          icon: BookOpen,
+          badge: liveIndicators.coaCount,
+          badgeColor: "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+        },
+        {
+          name: "Laporan Akuntansi & SHU",
+          href: "/laporan",
+          icon: TrendingUp
         },
       ],
     },
     {
       name: "Sistem & Manajemen",
       items: [
-        { 
-          name: "Pengaturan Produk", 
-          href: "/produk", 
+        {
+          name: "Pengaturan Produk",
+          href: "/produk",
           icon: Package,
           badge: liveIndicators.produkCount,
           badgeColor: "bg-purple-500/20 text-purple-400 border border-purple-500/30"
         },
-        { 
-          name: "Manajemen User", 
-          href: "/users", 
+        {
+          name: "Manajemen User",
+          href: "/users",
           icon: UserCog,
           badge: liveIndicators.userCount,
           badgeColor: "bg-blue-500/20 text-blue-400 border border-blue-500/30"
         },
-        { 
-          name: "Manajemen Cabang", 
-          href: "/cabang", 
+        {
+          name: "Manajemen Cabang",
+          href: "/cabang",
           icon: MapPin,
           badge: liveIndicators.cabangCount,
           badgeColor: "bg-rose-500/20 text-rose-400 border border-rose-500/30"
         },
-        { 
-          name: "Pengaturan & Audit Trail", 
-          href: "/pengaturan", 
+        {
+          name: "Pengaturan & Audit Trail",
+          href: "/pengaturan",
           icon: ShieldCheck,
           badge: liveIndicators.auditLogCount,
           badgeColor: "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
