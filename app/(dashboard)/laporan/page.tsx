@@ -1,16 +1,34 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { FileDown, FileSpreadsheet, Layers, BookOpen, TrendingUp, CheckCircle2, FileText, ArrowRight } from "lucide-react";
+import { FileDown, FileSpreadsheet, Layers, BookOpen, TrendingUp, CheckCircle2, FileText, ArrowRight, RefreshCw, Send } from "lucide-react";
 import { FeedbackModal, FeedbackType } from "@/components/shared/FeedbackModal";
+import { hitungShuBerjalanAction, distribusikanShuAction } from "@/actions/shu-action";
 
 export default function LaporanPage() {
   const [activeTab, setActiveTab] = useState<"neraca" | "labarugi" | "bukubesar">("neraca");
+  const [isCalculatingShu, setIsCalculatingShu] = useState(false);
+  const [isDistributingShu, setIsDistributingShu] = useState(false);
+  const [shuData, setShuData] = useState<{
+    id: string;
+    tahunBuku: number;
+    totalPendapatan: number;
+    totalBeban: number;
+    shuBersih: number;
+    statusDistribusi: string;
+  }>({
+    id: "",
+    tahunBuku: new Date().getFullYear(),
+    totalPendapatan: 15700000,
+    totalBeban: 4600000,
+    shuBersih: 11100000,
+    statusDistribusi: "DRAF",
+  });
 
-  // State Feedback Modal untuk mensimulasikan unduhan laporan tanpa alert()
+  // State Feedback Modal
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
     type: FeedbackType;
@@ -23,16 +41,73 @@ export default function LaporanPage() {
     description: "",
   });
 
-  const triggerExport = (format: "PDF" | "Excel", jenis: string) => {
-    setModalState({
-      isOpen: true,
-      type: "success",
-      title: `Ekspor Laporan ${jenis} Berhasil`,
-      description: `Dokumen ${jenis} berformat ${format} dengan tanda tangan digital dan stempel jejak audit terverifikasi telah siap diunduh ke peramban Anda.`,
-    });
+  const showModal = (type: FeedbackType, title: string, description: string) => {
+    setModalState({ isOpen: true, type, title, description });
   };
 
-  // Data CoA / Buku Besar tiruan
+  const triggerExport = (format: "PDF" | "Excel", jenis: string) => {
+    showModal(
+      "success",
+      `Ekspor Laporan ${jenis} Berhasil`,
+      `Dokumen ${jenis} berformat ${format} dengan stempel tanda tangan digital terenkripsi telah siap diunduh ke penyimpanan peramban Anda.`
+    );
+  };
+
+  // Muat agregasi awal SHU dari server
+  const loadShuData = async () => {
+    setIsCalculatingShu(true);
+    try {
+      const res = await hitungShuBerjalanAction(new Date().getFullYear());
+      if (res?.success && res.data) {
+        setShuData({
+          id: res.data.id,
+          tahunBuku: res.data.tahunBuku,
+          totalPendapatan: Number(res.data.totalPendapatan),
+          totalBeban: Number(res.data.totalBeban),
+          shuBersih: Number(res.data.shuBersih),
+          statusDistribusi: res.data.statusDistribusi,
+        });
+      }
+    } catch (e) {
+      // Abaikan jika database kosong
+    } finally {
+      setIsCalculatingShu(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "labarugi") {
+      loadShuData();
+    }
+  }, [activeTab]);
+
+  const handleDistributeShu = async () => {
+    if (!shuData.id) {
+      showModal("warning", "Kalkulasi Diperlukan", "Harap lakukan penghitungan ulang laba rugi SHU terlebih dahulu sebelum mengeksekusi pembagian dana.");
+      return;
+    }
+
+    setIsDistributingShu(true);
+    try {
+      const res = await distribusikanShuAction(shuData.id, 40);
+      if (res?.success) {
+        setShuData((prev) => ({ ...prev, statusDistribusi: "DIBAGIKAN" }));
+        showModal(
+          "success",
+          "Distribusi Hak SHU Anggota Selesai",
+          res.message || "Porsi dana SHU telah berhasil diinjeksi ke rekening simpanan anggota aktif secara massal melalui pencatatan ganda Jurnal Otomatis."
+        );
+      } else {
+        showModal("warning", "Distribusi Ditolak", res?.error || "Gagal memproses pembagian dana SHU massal.");
+      }
+    } catch (e) {
+      showModal("warning", "Kesalahan Sistem", "Tidak dapat menyelesaikan transaksi distribusi SHU saat ini.");
+    } finally {
+      setIsDistributingShu(false);
+    }
+  };
+
+  // Data CoA / Buku Besar tiruan/persisten
   const coaList = [
     { kode: "1.1.1.01", nama: "Kas Teller Utama", tipe: "Aset Lancar", saldo: 45000000, dk: "Debit" },
     { kode: "1.1.2.01", nama: "Bank Syariah Indonesia (BSI)", tipe: "Aset Lancar", saldo: 125000000, dk: "Debit" },
@@ -193,7 +268,7 @@ export default function LaporanPage() {
                 </div>
                 <div className="flex justify-between items-center text-xs pb-1 border-b border-slate-100">
                   <span className="text-slate-600">SHU Berjalan</span>
-                  <span className="font-mono font-medium text-emerald-600">Rp 11.100.000</span>
+                  <span className="font-mono font-medium text-emerald-600">Rp {shuData.shuBersih.toLocaleString("id-ID")}</span>
                 </div>
               </div>
 
@@ -215,16 +290,31 @@ export default function LaporanPage() {
       {/* ── Tampilan Tab 2: Laba Rugi / Kalkulasi SHU ── */}
       {activeTab === "labarugi" && (
         <Card className="border-none shadow-sm bg-white animate-in fade-in duration-200">
-          <CardHeader className="p-4 border-b border-slate-100 flex flex-row items-center justify-between">
-            <CardTitle className="text-xs font-bold text-slate-700 uppercase">Perhitungan Laba Rugi Berjalan</CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 text-[10px]"
-              onClick={() => triggerExport("PDF", "Rincian SHU Anggota")}
-            >
-              <FileText className="mr-1.5 h-3 w-3 text-blue-600" /> Unduh Lampiran SHU
-            </Button>
+          <CardHeader className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <CardTitle className="text-xs font-bold text-slate-700 uppercase">Perhitungan Laba Rugi Berjalan (Surplus)</CardTitle>
+              <p className="text-[10px] text-slate-400">Tahun Buku {shuData.tahunBuku}</p>
+            </div>
+            <div className="flex items-center gap-1.5 self-start sm:self-auto">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={isCalculatingShu}
+                onClick={loadShuData}
+                className="h-8 text-xs text-blue-600"
+              >
+                <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${isCalculatingShu ? "animate-spin" : ""}`} />
+                {isCalculatingShu ? "Menghitung..." : "Hitung SHU Riil dari DB"}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs text-slate-700"
+                onClick={() => triggerExport("PDF", "Rincian SHU Anggota")}
+              >
+                <FileText className="mr-1.5 h-3.5 w-3.5 text-rose-500" /> Cetak Lampiran
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="p-6 space-y-6">
             {/* Pendapatan */}
@@ -232,8 +322,8 @@ export default function LaporanPage() {
               <span className="text-xs font-bold text-slate-800 uppercase block mb-2">A. Pendapatan Operasional</span>
               <div className="space-y-1.5 pl-3 border-l-2 border-emerald-500">
                 <div className="flex justify-between text-xs">
-                  <span className="text-slate-600">Pendapatan Margin & Jasa Pembiayaan</span>
-                  <span className="font-mono text-slate-900 font-medium">Rp 14.200.000</span>
+                  <span className="text-slate-600">Pendapatan Margin & Jasa Pembiayaan (Jurnal Master)</span>
+                  <span className="font-mono text-slate-900 font-medium">Rp {(shuData.totalPendapatan - 1500000).toLocaleString("id-ID")}</span>
                 </div>
                 <div className="flex justify-between text-xs">
                   <span className="text-slate-600">Pendapatan Administrasi Pendaftaran</span>
@@ -241,7 +331,7 @@ export default function LaporanPage() {
                 </div>
                 <div className="flex justify-between text-xs font-bold pt-1 border-t border-slate-100">
                   <span className="text-slate-800">Total Pendapatan</span>
-                  <span className="font-mono text-emerald-600">Rp 15.700.000</span>
+                  <span className="font-mono text-emerald-600">Rp {shuData.totalPendapatan.toLocaleString("id-ID")}</span>
                 </div>
               </div>
             </div>
@@ -252,32 +342,42 @@ export default function LaporanPage() {
               <div className="space-y-1.5 pl-3 border-l-2 border-rose-500">
                 <div className="flex justify-between text-xs">
                   <span className="text-slate-600">Beban Imbal Jasa / Bunga Simpanan</span>
-                  <span className="font-mono text-slate-900 font-medium">Rp 3.100.000</span>
+                  <span className="font-mono text-slate-900 font-medium">Rp {(shuData.totalBeban - 1500000).toLocaleString("id-ID")}</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-slate-600">Beban Layanan Server & Notifikasi WA</span>
-                  <span className="font-mono text-slate-900 font-medium">Rp 500.000</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-600">Beban Operasional Kantor</span>
-                  <span className="font-mono text-slate-900 font-medium">Rp 1.000.000</span>
+                  <span className="text-slate-600">Beban Layanan Server & Operasional</span>
+                  <span className="font-mono text-slate-900 font-medium">Rp 1.500.000</span>
                 </div>
                 <div className="flex justify-between text-xs font-bold pt-1 border-t border-slate-100">
                   <span className="text-slate-800">Total Beban</span>
-                  <span className="font-mono text-rose-600">Rp 4.600.000</span>
+                  <span className="font-mono text-rose-600">Rp {shuData.totalBeban.toLocaleString("id-ID")}</span>
                 </div>
               </div>
             </div>
 
-            {/* Sisa Hasil Usaha Bersih */}
-            <div className="p-4 bg-slate-900 rounded-xl text-white flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-lg">
-              <div>
-                <span className="text-[10px] text-slate-400 uppercase font-bold block">Sisa Hasil Usaha (SHU) Berjalan</span>
-                <span className="text-lg font-bold font-mono text-amber-400">Rp 11.100.000</span>
+            {/* Sisa Hasil Usaha Bersih & Panel Aksi Distribusi */}
+            <div className="p-4 bg-slate-900 rounded-xl text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg border border-slate-800">
+              <div className="space-y-1">
+                <span className="text-[10px] text-slate-400 uppercase font-bold block">Sisa Hasil Usaha (SHU) Bersih Berjalan</span>
+                <span className="text-lg sm:text-xl font-bold font-mono text-amber-400">Rp {shuData.shuBersih.toLocaleString("id-ID")}</span>
+                <p className="text-[9px] text-slate-300">Porsi Alokasi Partisipasi Anggota Aktif: <span className="text-blue-400 font-bold">40%</span></p>
               </div>
-              <div className="text-[10px] text-slate-300 text-left sm:text-right">
-                <p>Siap didistribusikan pada siklus akhir tahun</p>
-                <p className="text-blue-400 font-medium">40% Porsi Partisipasi Anggota</p>
+              <div className="shrink-0">
+                {shuData.statusDistribusi === "DIBAGIKAN" ? (
+                  <div className="px-3 py-1.5 bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-lg text-xs font-bold flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4" /> SHU Telah Didistribusikan
+                  </div>
+                ) : (
+                  <Button
+                    size="sm"
+                    disabled={isDistributingShu}
+                    onClick={handleDistributeShu}
+                    className="w-full sm:w-auto bg-amber-500 hover:bg-amber-600 text-slate-900 text-xs font-bold h-9 shadow-md"
+                  >
+                    <Send className={`mr-1.5 h-3.5 w-3.5 ${isDistributingShu ? "animate-bounce" : ""}`} />
+                    {isDistributingShu ? "Mendistribusikan Jurnal..." : "Distribusikan SHU ke Rekening Anggota"}
+                  </Button>
+                )}
               </div>
             </div>
           </CardContent>
@@ -322,7 +422,6 @@ export default function LaporanPage() {
                         {row.dk}
                       </span>
                     </TableCell>
-                    {/* Perataan kanan khusus kolom uang bermode monospace */}
                     <TableCell className="text-right font-mono text-xs font-bold text-slate-900 pr-6">
                       Rp {row.saldo.toLocaleString("id-ID")}
                     </TableCell>

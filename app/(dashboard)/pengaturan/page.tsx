@@ -3,13 +3,15 @@
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Save, ShieldCheck, Cpu, RefreshCw, Layers, Sliders, Database, AlertCircle } from "lucide-react";
+import { Save, ShieldCheck, RefreshCw, Sliders, AlertCircle } from "lucide-react";
 import { FeedbackModal, FeedbackType } from "@/components/shared/FeedbackModal";
 import { fetchAuditLogsAction } from "@/actions/audit-log-bridge";
+import { getPengaturanSistemAction, savePengaturanSistemAction } from "@/actions/pengaturan-action";
 
 export default function PengaturanPage() {
   const [activeSubTab, setActiveSubTab] = useState<"umum" | "audit">("umum");
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
 
   // State Feedback Modal
@@ -29,7 +31,7 @@ export default function PengaturanPage() {
     setModalState({ isOpen: true, type, title, description });
   };
 
-  // Form parameter sistem
+  // Form parameter sistem yang ditarik dari pangkalan data peladen
   const [configForm, setConfigForm] = useState({
     koperasiName: "KSP Harapan Artha Nusantara",
     simpananBungaPct: "4.5",
@@ -40,23 +42,60 @@ export default function PengaturanPage() {
     xenditToken: "xnd_callback_secure_token_abc123",
   });
 
-  const handleSaveConfig = () => {
-    showModal(
-      "success",
-      "Konfigurasi Sistem Berhasil Disimpan",
-      "Parameter margin pembiayaan, imbal jasa simpanan, dan kata sandi tugas latar belakang telah diperbarui. Log audit konfigurasi tersimpan atomik."
-    );
+  // Muat parameter asli dari server saat komponen dirender
+  useEffect(() => {
+    async function loadSettings() {
+      const res = await getPengaturanSistemAction();
+      if (res?.success && res.data) {
+        setConfigForm((prev) => ({
+          ...prev,
+          koperasiName: res.data.koperasiName || prev.koperasiName,
+          simpananBungaPct: res.data.simpananBungaPct.toString(),
+          pinjamanMarginPct: res.data.pinjamanMarginPct.toString(),
+          dendaHariPct: res.data.dendaHariPct.toString(),
+          maxPinjamanCount: res.data.maxPinjamanCount.toString(),
+        }));
+      }
+    }
+    loadSettings();
+  }, []);
+
+  const handleSaveConfig = async () => {
+    setIsSaving(true);
+    try {
+      const res = await savePengaturanSistemAction({
+        koperasiName: configForm.koperasiName,
+        simpananBungaPct: Number(configForm.simpananBungaPct) || 0,
+        pinjamanMarginPct: Number(configForm.pinjamanMarginPct) || 0,
+        dendaHariPct: Number(configForm.dendaHariPct) || 0,
+        maxPinjamanCount: Number(configForm.maxPinjamanCount) || 2,
+      });
+
+      if (res?.success) {
+        showModal(
+          "success",
+          "Konfigurasi Sistem Berhasil Disimpan",
+          "Parameter margin pembiayaan, imbal jasa simpanan, dan batasan kontrak aktif telah berhasil disimpan secara permanen ke basis data peladen. Log audit konfigurasi telah disisipkan atomik."
+        );
+      } else {
+        showModal("warning", "Gagal Memperbarui Parameter", res?.error || "Terjadi kendala saat menyimpan data ke peladen.");
+      }
+    } catch (e) {
+      showModal("warning", "Gangguan Jaringan", "Tidak dapat menghubungi peladen saat ini.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const loadLogs = async () => {
     setIsLoadingLogs(true);
     try {
       const res = await fetchAuditLogsAction(25);
-      if (res.success && res.data) {
+      if (res?.success && res.data) {
         setAuditLogs(res.data);
       }
     } catch (e) {
-      // Fallback diam jika belum ada migrasi data
+      // Abaikan jika kueri database gagal
     } finally {
       setIsLoadingLogs(false);
     }
@@ -68,7 +107,7 @@ export default function PengaturanPage() {
     }
   }, [activeSubTab]);
 
-  // Fallback tiruan jika database kosong agar presentasi UI tetap kaya
+  // Tampilan log persisten atau mock fallback agar presentasi antarmuka tetap kaya
   const displayLogs = auditLogs.length > 0 ? auditLogs : [
     { id: "log-1", source: "AI_AGENT", action: "GENERATE_CREDIT_SCORE", entityType: "ANGGOTA", entityId: "M-001", details: '{"grade":"A","score":780}', createdAt: new Date() },
     { id: "log-2", source: "TELLER", action: "BUKA_REKENING_SIMPANAN", entityType: "REKENING", entityId: "REC-001", details: '{"produk":"Sukarela","awal":500000}', createdAt: new Date(Date.now() - 3600000) },
@@ -82,14 +121,15 @@ export default function PengaturanPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Pengaturan Sistem & Audit</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Konfigurasi parameter koperasi dan pemantauan kepatuhan jejak aktivitas (Audit Trail).</p>
+          <p className="text-xs text-slate-500 mt-0.5">Konfigurasi parameter persisten dan pemantauan kepatuhan jejak aktivitas (Audit Trail).</p>
         </div>
         <Button
+          disabled={isSaving}
           className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-xs text-white"
           onClick={handleSaveConfig}
         >
-          <Save className="mr-2 h-4 w-4" />
-          Simpan Konfigurasi
+          <Save className={`mr-2 h-4 w-4 ${isSaving ? "animate-spin" : ""}`} />
+          {isSaving ? "Menyimpan ke Database..." : "Simpan Konfigurasi"}
         </Button>
       </div>
 

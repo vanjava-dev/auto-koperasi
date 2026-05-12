@@ -323,3 +323,35 @@ model AuditLog {
 
   @@map("audit_logs")
 }
+
+// ─── 7. ENTITAS PENGATURAN GLOBAL & RIWAYAT SHU ──────────────────
+
+model PengaturanSistem {
+  id                String   @id @default(uuid())
+  koperasiId        String   @unique
+  marginPembiayaan  Decimal  @db.Decimal(5, 2) @default(12.0)
+  bungaSimpanan     Decimal  @db.Decimal(5, 2) @default(4.5)
+  dendaKeterlambatan Decimal @db.Decimal(5, 2) @default(0.1)
+  maxPinjamanAktif  Int      @default(2)
+  cronSecretKey     String   @default("koperasi_secure_cron_key_999")
+  xenditWebhookToken String  @default("xnd_callback_secure_token_abc123")
+  updatedAt         DateTime @updatedAt
+
+  @@map("pengaturan_sistem")
+}
+
+model RiwayatShu {
+  id                String   @id @default(uuid())
+  koperasiId        String
+  tahunBuku         Int
+  totalPendapatan   Decimal  @db.Decimal(15, 2)
+  totalBeban        Decimal  @db.Decimal(15, 2)
+  shuBersih         Decimal  @db.Decimal(15, 2)
+  statusDistribusi  String   @default("DRAF") // "DRAF", "DIBAGIKAN"
+  dihitungAt        DateTime @default(now())
+  didistribusikanAt DateTime?
+
+  @@unique([koperasiId, tahunBuku])
+  @@map("riwayat_shu")
+}
+
