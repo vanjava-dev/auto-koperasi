@@ -1,0 +1,347 @@
+"use client";
+
+import React, { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { FileDown, FileSpreadsheet, Layers, BookOpen, TrendingUp, CheckCircle2, FileText, ArrowRight } from "lucide-react";
+import { FeedbackModal, FeedbackType } from "@/components/shared/FeedbackModal";
+
+export default function LaporanPage() {
+  const [activeTab, setActiveTab] = useState<"neraca" | "labarugi" | "bukubesar">("neraca");
+
+  // State Feedback Modal untuk mensimulasikan unduhan laporan tanpa alert()
+  const [modalState, setModalState] = useState<{
+    isOpen: boolean;
+    type: FeedbackType;
+    title: string;
+    description: string;
+  }>({
+    isOpen: false,
+    type: "success",
+    title: "",
+    description: "",
+  });
+
+  const triggerExport = (format: "PDF" | "Excel", jenis: string) => {
+    setModalState({
+      isOpen: true,
+      type: "success",
+      title: `Ekspor Laporan ${jenis} Berhasil`,
+      description: `Dokumen ${jenis} berformat ${format} dengan tanda tangan digital dan stempel jejak audit terverifikasi telah siap diunduh ke peramban Anda.`,
+    });
+  };
+
+  // Data CoA / Buku Besar tiruan
+  const coaList = [
+    { kode: "1.1.1.01", nama: "Kas Teller Utama", tipe: "Aset Lancar", saldo: 45000000, dk: "Debit" },
+    { kode: "1.1.2.01", nama: "Bank Syariah Indonesia (BSI)", tipe: "Aset Lancar", saldo: 125000000, dk: "Debit" },
+    { kode: "1.1.3.01", nama: "Piutang Pembiayaan Anggota", tipe: "Aset Lancar", saldo: 51700000, dk: "Debit" },
+    { kode: "2.1.1.01", nama: "Simpanan Sukarela Anggota", tipe: "Kewajiban Pendek", saldo: 12450000, dk: "Kredit" },
+    { kode: "2.1.2.01", nama: "Simpanan Berjangka (Deposito)", tipe: "Kewajiban Pendek", saldo: 45000000, dk: "Kredit" },
+    { kode: "3.1.1.01", nama: "Modal Simpanan Pokok", tipe: "Ekuitas", saldo: 6250000, dk: "Kredit" },
+    { kode: "3.1.2.01", nama: "Modal Simpanan Wajib", tipe: "Ekuitas", saldo: 18350000, dk: "Kredit" },
+    { kode: "4.1.1.01", nama: "Pendapatan Margin Pembiayaan", tipe: "Pendapatan", saldo: 14200000, dk: "Kredit" },
+    { kode: "5.1.1.01", nama: "Beban Bagi Hasil Simpanan", tipe: "Beban", saldo: 3100000, dk: "Debit" },
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* ── Header Halaman ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Laporan Keuangan & Akuntansi</h1>
+          <p className="text-xs text-slate-500 mt-0.5">Sistem pembukuan ganda terintegrasi berstandar PSAK Koperasi ("Audit-Ready").</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            className="w-full sm:w-auto text-xs border-slate-200 text-slate-700"
+            onClick={() => triggerExport("Excel", "Buku Besar Lengkap")}
+          >
+            <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-600" />
+            Ekspor CoA (.xlsx)
+          </Button>
+          <Button
+            className="w-full sm:w-auto bg-slate-900 hover:bg-slate-800 text-xs text-white"
+            onClick={() => triggerExport("PDF", "Paket Laporan Eksekutif")}
+          >
+            <FileDown className="mr-2 h-4 w-4 text-blue-400" />
+            Unduh Laporan Resmi
+          </Button>
+        </div>
+      </div>
+
+      {/* ── Tab Switcher Tabler Style ── */}
+      <div className="flex border-b border-slate-200">
+        <button
+          onClick={() => setActiveTab("neraca")}
+          className={`flex items-center gap-2 py-3 px-4 text-xs font-bold border-b-2 transition-all ${
+            activeTab === "neraca"
+              ? "border-blue-600 text-blue-600 bg-blue-50/30"
+              : "border-transparent text-slate-500 hover:text-slate-900"
+          }`}
+        >
+          <Layers className="w-4 h-4" />
+          Neraca Keuangan (Balance Sheet)
+        </button>
+        <button
+          onClick={() => setActiveTab("labarugi")}
+          className={`flex items-center gap-2 py-3 px-4 text-xs font-bold border-b-2 transition-all ${
+            activeTab === "labarugi"
+              ? "border-blue-600 text-blue-600 bg-blue-50/30"
+              : "border-transparent text-slate-500 hover:text-slate-900"
+          }`}
+        >
+          <TrendingUp className="w-4 h-4" />
+          Laba Rugi & Kalkulasi SHU
+        </button>
+        <button
+          onClick={() => setActiveTab("bukubesar")}
+          className={`flex items-center gap-2 py-3 px-4 text-xs font-bold border-b-2 transition-all ${
+            activeTab === "bukubesar"
+              ? "border-blue-600 text-blue-600 bg-blue-50/30"
+              : "border-transparent text-slate-500 hover:text-slate-900"
+          }`}
+        >
+          <BookOpen className="w-4 h-4" />
+          Buku Besar / CoA (Ledger)
+        </button>
+      </div>
+
+      {/* ── Tampilan Tab 1: Neraca Keuangan Berimbang ── */}
+      {activeTab === "neraca" && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in duration-200">
+          {/* Kolom Aset (Debit) */}
+          <Card className="border-none shadow-sm bg-white">
+            <CardHeader className="bg-slate-50/70 p-4 border-b border-slate-100">
+              <CardTitle className="text-xs font-bold text-slate-700 uppercase flex items-center justify-between">
+                <span>Aset (Aktiva)</span>
+                <span className="text-[10px] text-slate-400 font-mono">Posisi Debit</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 space-y-4">
+              <div className="space-y-2">
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Aset Lancar</span>
+                <div className="flex justify-between items-center text-xs pb-1 border-b border-slate-100">
+                  <span className="text-slate-600">Kas Tunai Teller</span>
+                  <span className="font-mono font-medium text-slate-900">Rp 45.000.000</span>
+                </div>
+                <div className="flex justify-between items-center text-xs pb-1 border-b border-slate-100">
+                  <span className="text-slate-600">Rekening Bank BSI</span>
+                  <span className="font-mono font-medium text-slate-900">Rp 125.000.000</span>
+                </div>
+                <div className="flex justify-between items-center text-xs pb-1 border-b border-slate-100">
+                  <span className="text-slate-600">Piutang Pembiayaan Bersih</span>
+                  <span className="font-mono font-medium text-slate-900">Rp 51.700.000</span>
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-2">
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Aset Tetap</span>
+                <div className="flex justify-between items-center text-xs pb-1 border-b border-slate-100">
+                  <span className="text-slate-600">Inventaris Kantor & Sistem</span>
+                  <span className="font-mono font-medium text-slate-900">Rp 25.000.000</span>
+                </div>
+                <div className="flex justify-between items-center text-xs pb-1 border-b border-slate-100">
+                  <span className="text-slate-400 italic">Akumulasi Penyusutan</span>
+                  <span className="font-mono text-rose-500">(Rp 5.000.000)</span>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t-2 border-slate-900 flex justify-between items-center text-xs font-bold">
+                <span className="text-slate-900 uppercase">Total Aset</span>
+                <span className="font-mono text-sm text-blue-600">Rp 241.700.000</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Kolom Kewajiban & Ekuitas (Kredit) */}
+          <Card className="border-none shadow-sm bg-white">
+            <CardHeader className="bg-slate-50/70 p-4 border-b border-slate-100">
+              <CardTitle className="text-xs font-bold text-slate-700 uppercase flex items-center justify-between">
+                <span>Kewajiban & Ekuitas (Pasiva)</span>
+                <span className="text-[10px] text-slate-400 font-mono">Posisi Kredit</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 space-y-4">
+              <div className="space-y-2">
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Kewajiban Jangka Pendek</span>
+                <div className="flex justify-between items-center text-xs pb-1 border-b border-slate-100">
+                  <span className="text-slate-600">Simpanan Sukarela Anggota</span>
+                  <span className="font-mono font-medium text-slate-900">Rp 12.450.000</span>
+                </div>
+                <div className="flex justify-between items-center text-xs pb-1 border-b border-slate-100">
+                  <span className="text-slate-600">Deposito Berjangka</span>
+                  <span className="font-mono font-medium text-slate-900">Rp 45.000.000</span>
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-2">
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Ekuitas Permodalan</span>
+                <div className="flex justify-between items-center text-xs pb-1 border-b border-slate-100">
+                  <span className="text-slate-600">Modal Simpanan Pokok</span>
+                  <span className="font-mono font-medium text-slate-900">Rp 6.250.000</span>
+                </div>
+                <div className="flex justify-between items-center text-xs pb-1 border-b border-slate-100">
+                  <span className="text-slate-600">Modal Simpanan Wajib</span>
+                  <span className="font-mono font-medium text-slate-900">Rp 18.350.000</span>
+                </div>
+                <div className="flex justify-between items-center text-xs pb-1 border-b border-slate-100">
+                  <span className="text-slate-600">Cadangan Koperasi & Aset</span>
+                  <span className="font-mono font-medium text-slate-900">Rp 148.550.000</span>
+                </div>
+                <div className="flex justify-between items-center text-xs pb-1 border-b border-slate-100">
+                  <span className="text-slate-600">SHU Berjalan</span>
+                  <span className="font-mono font-medium text-emerald-600">Rp 11.100.000</span>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t-2 border-slate-900 flex justify-between items-center text-xs font-bold">
+                <span className="text-slate-900 uppercase">Total Kewajiban & Ekuitas</span>
+                <span className="font-mono text-sm text-emerald-600">Rp 241.700.000</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="col-span-1 md:col-span-2 p-3 bg-slate-50 rounded-xl flex items-center justify-center gap-2 border border-slate-100">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <span className="text-xs font-bold text-slate-700">Status Neraca: SEIMBANG (Balanced)</span>
+            <span className="text-[10px] text-slate-400 font-mono">| Selisih: Rp 0</span>
+          </div>
+        </div>
+      )}
+
+      {/* ── Tampilan Tab 2: Laba Rugi / Kalkulasi SHU ── */}
+      {activeTab === "labarugi" && (
+        <Card className="border-none shadow-sm bg-white animate-in fade-in duration-200">
+          <CardHeader className="p-4 border-b border-slate-100 flex flex-row items-center justify-between">
+            <CardTitle className="text-xs font-bold text-slate-700 uppercase">Perhitungan Laba Rugi Berjalan</CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-[10px]"
+              onClick={() => triggerExport("PDF", "Rincian SHU Anggota")}
+            >
+              <FileText className="mr-1.5 h-3 w-3 text-blue-600" /> Unduh Lampiran SHU
+            </Button>
+          </CardHeader>
+          <CardContent className="p-6 space-y-6">
+            {/* Pendapatan */}
+            <div>
+              <span className="text-xs font-bold text-slate-800 uppercase block mb-2">A. Pendapatan Operasional</span>
+              <div className="space-y-1.5 pl-3 border-l-2 border-emerald-500">
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-600">Pendapatan Margin & Jasa Pembiayaan</span>
+                  <span className="font-mono text-slate-900 font-medium">Rp 14.200.000</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-600">Pendapatan Administrasi Pendaftaran</span>
+                  <span className="font-mono text-slate-900 font-medium">Rp 1.500.000</span>
+                </div>
+                <div className="flex justify-between text-xs font-bold pt-1 border-t border-slate-100">
+                  <span className="text-slate-800">Total Pendapatan</span>
+                  <span className="font-mono text-emerald-600">Rp 15.700.000</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Beban */}
+            <div>
+              <span className="text-xs font-bold text-slate-800 uppercase block mb-2">B. Beban Operasional</span>
+              <div className="space-y-1.5 pl-3 border-l-2 border-rose-500">
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-600">Beban Imbal Jasa / Bunga Simpanan</span>
+                  <span className="font-mono text-slate-900 font-medium">Rp 3.100.000</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-600">Beban Layanan Server & Notifikasi WA</span>
+                  <span className="font-mono text-slate-900 font-medium">Rp 500.000</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-600">Beban Operasional Kantor</span>
+                  <span className="font-mono text-slate-900 font-medium">Rp 1.000.000</span>
+                </div>
+                <div className="flex justify-between text-xs font-bold pt-1 border-t border-slate-100">
+                  <span className="text-slate-800">Total Beban</span>
+                  <span className="font-mono text-rose-600">Rp 4.600.000</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Sisa Hasil Usaha Bersih */}
+            <div className="p-4 bg-slate-900 rounded-xl text-white flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-lg">
+              <div>
+                <span className="text-[10px] text-slate-400 uppercase font-bold block">Sisa Hasil Usaha (SHU) Berjalan</span>
+                <span className="text-lg font-bold font-mono text-amber-400">Rp 11.100.000</span>
+              </div>
+              <div className="text-[10px] text-slate-300 text-left sm:text-right">
+                <p>Siap didistribusikan pada siklus akhir tahun</p>
+                <p className="text-blue-400 font-medium">40% Porsi Partisipasi Anggota</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Tampilan Tab 3: Buku Besar / Chart of Accounts ── */}
+      {activeTab === "bukubesar" && (
+        <Card className="border-none shadow-sm bg-white overflow-hidden animate-in fade-in duration-200">
+          <CardHeader className="p-4 border-b border-slate-100">
+            <CardTitle className="text-xs font-bold text-slate-700 uppercase">Daftar Akun Master (CoA) & Saldo Riil</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0 overflow-x-auto max-w-full">
+            <Table className="min-w-[600px]">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="th-standard pl-6">Kode Akun</TableHead>
+                  <TableHead className="th-standard">Nama Akun</TableHead>
+                  <TableHead className="th-standard text-center">Klasifikasi</TableHead>
+                  <TableHead className="th-standard text-center">Sifat Normal</TableHead>
+                  <TableHead className="th-standard text-right pr-6">Saldo Buku</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {coaList.map((row) => (
+                  <TableRow key={row.kode} className="hover:bg-slate-50/50">
+                    <TableCell className="pl-6 font-mono text-xs font-bold text-blue-600">
+                      {row.kode}
+                    </TableCell>
+                    <TableCell className="text-xs font-medium text-slate-900">
+                      {row.nama}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <span className="text-[10px] bg-slate-50 px-2 py-0.5 rounded text-slate-600 font-medium">
+                        {row.tipe}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <span className={`text-[10px] font-bold ${
+                        row.dk === "Debit" ? "text-emerald-600" : "text-purple-600"
+                      }`}>
+                        {row.dk}
+                      </span>
+                    </TableCell>
+                    {/* Perataan kanan khusus kolom uang bermode monospace */}
+                    <TableCell className="text-right font-mono text-xs font-bold text-slate-900 pr-6">
+                      Rp {row.saldo.toLocaleString("id-ID")}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Pemanggilan Global FeedbackModal ── */}
+      <FeedbackModal
+        isOpen={modalState.isOpen}
+        onClose={() => setModalState((prev) => ({ ...prev, isOpen: false }))}
+        type={modalState.type}
+        title={modalState.title}
+        description={modalState.description}
+      />
+    </div>
+  );
+}
