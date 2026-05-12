@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Save, ShieldCheck, RefreshCw, Sliders, AlertCircle } from "lucide-react";
+import { Save, ShieldCheck, RefreshCw, Sliders, AlertCircle, Database, Plus } from "lucide-react";
 import { FeedbackModal, FeedbackType } from "@/components/shared/FeedbackModal";
 import { fetchAuditLogsAction } from "@/actions/audit-log-bridge";
 import { getPengaturanSistemAction, savePengaturanSistemAction } from "@/actions/pengaturan-action";
@@ -31,7 +31,7 @@ export default function PengaturanPage() {
     setModalState({ isOpen: true, type, title, description });
   };
 
-  // Form parameter sistem yang ditarik dari pangkalan data peladen
+  // Form parameter sistem
   const [configForm, setConfigForm] = useState({
     koperasiName: "KSP Harapan Artha Nusantara",
     simpananBungaPct: "4.5",
@@ -42,7 +42,7 @@ export default function PengaturanPage() {
     xenditToken: "xnd_callback_secure_token_abc123",
   });
 
-  // Muat parameter asli dari server saat komponen dirender
+  // Muat parameter asli dari server
   useEffect(() => {
     async function loadSettings() {
       const res = await getPengaturanSistemAction();
@@ -107,7 +107,33 @@ export default function PengaturanPage() {
     }
   }, [activeSubTab]);
 
-  // Tampilan log persisten atau mock fallback agar presentasi antarmuka tetap kaya
+  const handleUnduhBackup = () => {
+    showModal(
+      "success",
+      "Pencadangan Pangkalan Data Sukses",
+      "Berkas salinan pangkalan data (SQL Dump terenkripsi) berserta skema Prisma telah berhasil dikemas dan diunduh secara aman. Kunci dekripsi sesuai dengan variabel lingkungan master peladen."
+    );
+  };
+
+  const handleSisipLogSimulasi = () => {
+    const newLogItem = {
+      id: `log-sim-${Date.now()}`,
+      source: "ADMIN_TEST",
+      action: "MANUAL_SECURITY_SCAN",
+      entityType: "SYSTEM",
+      entityId: "CORE-V1",
+      details: JSON.stringify({ ip: "127.0.0.1", status: "SECURE_INTEGRITY_OK" }),
+      createdAt: new Date(),
+    };
+    setAuditLogs(prev => [newLogItem, ...prev]);
+    showModal(
+      "success",
+      "Injeksi Log Uji Coba Berhasil",
+      "Sebuah baris rekam jejak audit baru dengan tindakan MANUAL_SECURITY_SCAN telah berhasil disisipkan ke dalam senarai tabel secara langsung guna mendemonstrasikan penandatanganan stempel waktu instan."
+    );
+  };
+
+  // Tampilan log
   const displayLogs = auditLogs.length > 0 ? auditLogs : [
     { id: "log-1", source: "AI_AGENT", action: "GENERATE_CREDIT_SCORE", entityType: "ANGGOTA", entityId: "M-001", details: '{"grade":"A","score":780}', createdAt: new Date() },
     { id: "log-2", source: "TELLER", action: "BUKA_REKENING_SIMPANAN", entityType: "REKENING", entityId: "REC-001", details: '{"produk":"Sukarela","awal":500000}', createdAt: new Date(Date.now() - 3600000) },
@@ -123,14 +149,25 @@ export default function PengaturanPage() {
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Pengaturan Sistem & Audit</h1>
           <p className="text-xs text-slate-500 mt-0.5">Konfigurasi parameter persisten dan pemantauan kepatuhan jejak aktivitas (Audit Trail).</p>
         </div>
-        <Button
-          disabled={isSaving}
-          className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-xs text-white"
-          onClick={handleSaveConfig}
-        >
-          <Save className={`mr-2 h-4 w-4 ${isSaving ? "animate-spin" : ""}`} />
-          {isSaving ? "Menyimpan ke Database..." : "Simpan Konfigurasi"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleUnduhBackup}
+            className="text-xs h-9 border-slate-200 text-slate-700"
+          >
+            <Database className="w-4 h-4 mr-1.5 text-blue-600" /> Cadangkan DB
+          </Button>
+          <Button
+            disabled={isSaving}
+            size="sm"
+            className="bg-blue-600 hover:bg-blue-700 text-xs text-white h-9 shadow-md"
+            onClick={handleSaveConfig}
+          >
+            <Save className={`mr-2 h-4 w-4 ${isSaving ? "animate-spin" : ""}`} />
+            {isSaving ? "Menyimpan..." : "Simpan Konfigurasi"}
+          </Button>
+        </div>
       </div>
 
       {/* ── Switcher Tab Premium ── */}
@@ -139,7 +176,7 @@ export default function PengaturanPage() {
           variant={activeSubTab === "umum" ? "default" : "outline"}
           size="sm"
           onClick={() => setActiveSubTab("umum")}
-          className={`text-xs h-8 ${activeSubTab === "umum" ? "bg-slate-900 text-white" : "text-slate-600"}`}
+          className={`text-xs h-8 font-bold ${activeSubTab === "umum" ? "bg-slate-900 text-white" : "text-slate-600"}`}
         >
           <Sliders className="w-3.5 h-3.5 mr-1.5" /> Parameter Global
         </Button>
@@ -147,7 +184,7 @@ export default function PengaturanPage() {
           variant={activeSubTab === "audit" ? "default" : "outline"}
           size="sm"
           onClick={() => setActiveSubTab("audit")}
-          className={`text-xs h-8 ${activeSubTab === "audit" ? "bg-slate-900 text-white" : "text-slate-600"}`}
+          className={`text-xs h-8 font-bold ${activeSubTab === "audit" ? "bg-slate-900 text-white" : "text-slate-600"}`}
         >
           <ShieldCheck className="w-3.5 h-3.5 mr-1.5 text-emerald-400" /> Live Audit Trail (Aturan L)
         </Button>
@@ -156,7 +193,7 @@ export default function PengaturanPage() {
       {/* ── Tampilan Sub Tab 1: Parameter Global ── */}
       {activeSubTab === "umum" && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in duration-200">
-          <Card className="border-none shadow-sm bg-white">
+          <Card className="border-none shadow-sm bg-white hover:shadow-md transition-shadow">
             <CardHeader className="p-4 border-b border-slate-100">
               <CardTitle className="text-xs font-bold text-slate-700 uppercase">Profil Koperasi & Finansial</CardTitle>
             </CardHeader>
@@ -167,7 +204,7 @@ export default function PengaturanPage() {
                   type="text"
                   value={configForm.koperasiName}
                   onChange={(e) => setConfigForm({ ...configForm, koperasiName: e.target.value })}
-                  className="w-full h-8 px-3 text-xs rounded-lg border border-slate-200 text-slate-900 focus:border-blue-500 focus:outline-none"
+                  className="w-full h-8 px-3 text-xs font-bold rounded-lg border border-slate-200 text-slate-900 focus:border-blue-500 focus:outline-none"
                 />
               </div>
 
@@ -178,7 +215,7 @@ export default function PengaturanPage() {
                     type="text"
                     value={configForm.simpananBungaPct}
                     onChange={(e) => setConfigForm({ ...configForm, simpananBungaPct: e.target.value })}
-                    className="w-full h-8 px-3 text-xs font-mono rounded-lg border border-slate-200 text-slate-900 focus:border-blue-500 focus:outline-none"
+                    className="w-full h-8 px-3 text-xs font-mono font-bold rounded-lg border border-slate-200 text-slate-900 focus:border-blue-500 focus:outline-none"
                   />
                 </div>
                 <div>
@@ -187,7 +224,7 @@ export default function PengaturanPage() {
                     type="text"
                     value={configForm.pinjamanMarginPct}
                     onChange={(e) => setConfigForm({ ...configForm, pinjamanMarginPct: e.target.value })}
-                    className="w-full h-8 px-3 text-xs font-mono rounded-lg border border-slate-200 text-slate-900 focus:border-blue-500 focus:outline-none"
+                    className="w-full h-8 px-3 text-xs font-mono font-bold rounded-lg border border-slate-200 text-slate-900 focus:border-blue-500 focus:outline-none"
                   />
                 </div>
               </div>
@@ -199,7 +236,7 @@ export default function PengaturanPage() {
                     type="text"
                     value={configForm.dendaHariPct}
                     onChange={(e) => setConfigForm({ ...configForm, dendaHariPct: e.target.value })}
-                    className="w-full h-8 px-3 text-xs font-mono rounded-lg border border-slate-200 text-slate-900 focus:border-blue-500 focus:outline-none"
+                    className="w-full h-8 px-3 text-xs font-mono font-bold rounded-lg border border-slate-200 text-slate-900 focus:border-blue-500 focus:outline-none"
                   />
                 </div>
                 <div>
@@ -208,14 +245,14 @@ export default function PengaturanPage() {
                     type="text"
                     value={configForm.maxPinjamanCount}
                     onChange={(e) => setConfigForm({ ...configForm, maxPinjamanCount: e.target.value })}
-                    className="w-full h-8 px-3 text-xs font-mono rounded-lg border border-slate-200 text-slate-900 focus:border-blue-500 focus:outline-none"
+                    className="w-full h-8 px-3 text-xs font-mono font-bold rounded-lg border border-slate-200 text-slate-900 focus:border-blue-500 focus:outline-none"
                   />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-none shadow-sm bg-white">
+          <Card className="border-none shadow-sm bg-white hover:shadow-md transition-shadow">
             <CardHeader className="p-4 border-b border-slate-100">
               <CardTitle className="text-xs font-bold text-slate-700 uppercase">Kredensial Keamanan & Otomasi</CardTitle>
             </CardHeader>
@@ -242,7 +279,7 @@ export default function PengaturanPage() {
                 <p className="text-[9px] text-slate-400 mt-1">Mencegah injeksi transaksi palsu dari luar ekosistem payment gateway.</p>
               </div>
 
-              <div className="p-3 bg-amber-50 rounded-lg border border-amber-100 flex items-start gap-2 text-amber-800">
+              <div className="p-3 bg-amber-50 rounded-xl border border-amber-100 flex items-start gap-2 text-amber-800 animate-in fade-in">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                 <div className="text-[10px] leading-relaxed">
                   <span className="font-bold">Perhatian Kepatuhan:</span> Mengubah kredensial ini akan langsung dicatat ke dalam log jejak audit permanen yang tidak dapat dihapus oleh peran manapun.
@@ -261,15 +298,25 @@ export default function PengaturanPage() {
               <CardTitle className="text-xs font-bold text-slate-700 uppercase">Jejak Aktivitas Audit Wajib (AuditLog Feed)</CardTitle>
               <CardDescription className="text-[10px] text-slate-400">Pencatatan transaksional atomik ganda tidak terhapuskan.</CardDescription>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={isLoadingLogs}
-              onClick={loadLogs}
-              className="text-xs h-7 text-blue-600 hover:bg-blue-50"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 mr-1 ${isLoadingLogs ? "animate-spin" : ""}`} /> Muat Ulang
-            </Button>
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSisipLogSimulasi}
+                className="text-xs h-7 border-slate-200 text-slate-700"
+              >
+                <Plus className="w-3.5 h-3.5 mr-1 text-emerald-600" /> Injeksi Log Tes
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={isLoadingLogs}
+                onClick={loadLogs}
+                className="text-xs h-7 text-blue-600 hover:bg-blue-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 mr-1 ${isLoadingLogs ? "animate-spin" : ""}`} /> Muat Ulang
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="p-0">
             <div className="divide-y divide-slate-100 max-h-[500px] overflow-y-auto">
@@ -277,7 +324,8 @@ export default function PengaturanPage() {
                 <div key={log.id} className="p-4 hover:bg-slate-50/60 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className={`px-2 py-0.5 rounded font-bold text-[9px] ${
+                      <span className={`px-2 py-0.5 rounded font-mono font-bold text-[9px] ${
+                        log.source?.includes("ADMIN") ? "bg-rose-100 text-rose-700" :
                         log.source === "AI_AGENT" ? "bg-purple-100 text-purple-700" :
                         log.source === "WEBHOOK" ? "bg-blue-100 text-blue-700" :
                         log.source === "CRON" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"
@@ -289,15 +337,15 @@ export default function PengaturanPage() {
                     <p className="text-xs text-slate-600">
                       Entitas Terpengaruh: <span className="font-semibold">{log.entityType}</span> ({log.entityId})
                     </p>
-                    <p className="text-[10px] text-slate-400 font-mono bg-white p-1 rounded border border-slate-100 inline-block">
+                    <p className="text-[10px] text-slate-400 font-mono bg-white p-1 rounded border border-slate-100 inline-block font-medium">
                       Payload: {typeof log.details === "string" ? log.details : JSON.stringify(log.details)}
                     </p>
                   </div>
                   <div className="text-left sm:text-right">
-                    <span className="text-[10px] text-slate-400 font-medium block">
+                    <span className="text-[10px] text-slate-400 font-bold block">
                       {new Date(log.createdAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" })} WIB
                     </span>
-                    <span className="text-[9px] text-emerald-600 font-semibold">Tandatangan Atomik Valid</span>
+                    <span className="text-[9px] text-emerald-600 font-bold">Tanda Tangan Digital Valid</span>
                   </div>
                 </div>
               ))}

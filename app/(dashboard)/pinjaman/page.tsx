@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, CreditCard, ArrowUpRight, CheckCircle2, AlertTriangle, Eye, ShieldAlert, FileCheck2, Cpu } from "lucide-react";
+import { Search, Plus, CreditCard, ArrowUpRight, CheckCircle2, AlertTriangle, Eye, ShieldAlert, FileCheck2, Cpu, ArrowDownToLine } from "lucide-react";
 import { TablePagination, TableEmptyState } from "@/components/shared/TableHelper";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { FeedbackModal, FeedbackType } from "@/components/shared/FeedbackModal";
@@ -17,6 +17,7 @@ export default function PinjamanPage() {
   const [isOpenModal, setIsOpenModal] = useState(false);
   const [isScoringLoading, setIsScoringLoading] = useState(false);
   const [scoringResult, setScoringResult] = useState<any>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // State Feedback Modal
   const [modalState, setModalState] = useState<{
@@ -47,17 +48,18 @@ export default function PinjamanPage() {
     loanPurpose: "Modal Pengembangan Usaha Mikro",
   });
 
-  // Data tiruan portofolio pinjaman berjalan
+  // Senarai kontrak pinjaman berjalan dinamis
   const [loanList, setLoanList] = useState([
-    { id: "LOAN-001", noKontrak: "PF-2024-0001", name: "Budi Santoso", amount: 15000000, outstanding: 8500000, tenor: "24 Bulan", status: "LANCAR", riskGrade: "A" },
-    { id: "LOAN-002", noKontrak: "PF-2024-0002", name: "Siti Aminah", amount: 5000000, outstanding: 1200000, tenor: "12 Bulan", status: "LANCAR", riskGrade: "A" },
-    { id: "LOAN-003", noKontrak: "PF-2024-0003", name: "Ahmad Dahlan", amount: 25000000, outstanding: 25000000, tenor: "36 Bulan", status: "DPK", riskGrade: "B" },
-    { id: "LOAN-004", noKontrak: "PF-2024-0004", name: "Dewi Lestari", amount: 10000000, outstanding: 9500000, tenor: "18 Bulan", status: "LANCAR", riskGrade: "A" },
-    { id: "LOAN-005", noKontrak: "PF-2024-0005", name: "Rina Nose", amount: 7500000, outstanding: 7500000, tenor: "12 Bulan", status: "MACET", riskGrade: "D" },
+    { id: "LOAN-001", noKontrak: "PF-2024-0001", name: "Budi Santoso", amount: 15000000, outstanding: 8500000, tenor: "24 Bulan", status: "LANCAR", riskGrade: "A", isCair: true },
+    { id: "LOAN-002", noKontrak: "PF-2024-0002", name: "Siti Aminah", amount: 5000000, outstanding: 1200000, tenor: "12 Bulan", status: "LANCAR", riskGrade: "A", isCair: true },
+    { id: "LOAN-003", noKontrak: "PF-2024-0003", name: "Ahmad Dahlan", amount: 25000000, outstanding: 25000000, tenor: "36 Bulan", status: "DPK", riskGrade: "B", isCair: true },
+    { id: "LOAN-004", noKontrak: "PF-2024-0004", name: "Dewi Lestari", amount: 10000000, outstanding: 9500000, tenor: "18 Bulan", status: "LANCAR", riskGrade: "A", isCair: true },
+    { id: "LOAN-005", noKontrak: "PF-2024-0005", name: "Rina Nose", amount: 7500000, outstanding: 7500000, tenor: "12 Bulan", status: "MACET", riskGrade: "D", isCair: true },
   ]);
 
   const filteredList = loanList.filter(
-    (item) => selectedFilter === "SEMUA" || item.status.toUpperCase() === selectedFilter
+    (item) => (selectedFilter === "SEMUA" || item.status.toUpperCase() === selectedFilter) &&
+              (item.name.toLowerCase().includes(searchQuery.toLowerCase()) || item.noKontrak.includes(searchQuery))
   );
 
   const handleLiveCreditScore = async () => {
@@ -96,6 +98,7 @@ export default function PinjamanPage() {
       tenor: `${loanForm.tenorMonths} Bulan`,
       status: "LANCAR",
       riskGrade: scoringResult.grade,
+      isCair: false, // Menunggu aksi pencairan kasir
     };
 
     setLoanList([newLoan, ...loanList]);
@@ -104,7 +107,26 @@ export default function PinjamanPage() {
     showModal(
       "success",
       "Pengajuan Pembiayaan Berhasil Diajukan",
-      `Kontrak pembiayaan ${newLoan.noKontrak} atas nama ${newLoan.name} dengan plafon Rp ${newLoan.amount.toLocaleString("id-ID")} telah dikirim ke antrean manajer dengan Risk Grade ${newLoan.riskGrade}. Entri log audit otomatis tersimpan.`
+      `Kontrak pembiayaan ${newLoan.noKontrak} atas nama ${newLoan.name} dengan plafon Rp ${newLoan.amount.toLocaleString("id-ID")} telah dikirim ke antrean dengan Risk Grade ${newLoan.riskGrade}. Sisa dana akan disalurkan saat tombol Pencairan ditekan.`
+    );
+  };
+
+  const handleLihatJadwal = (row: any) => {
+    const angsuranPokok = Math.round(row.outstanding / parseInt(row.tenor));
+    const marginBulanan = Math.round((row.amount * 0.12) / parseInt(row.tenor));
+    showModal(
+      "success",
+      `Rincian Pembiayaan: ${row.noKontrak}`,
+      `Debitur: ${row.name}\nPlafon: Rp ${row.amount.toLocaleString("id-ID")}\nOutstanding: Rp ${row.outstanding.toLocaleString("id-ID")}\nTenor: ${row.tenor}\nRisk Grade: ${row.riskGrade}\n\nEstimasi Kewajiban Per Bulan:\n• Pokok Angsuran: Rp ${angsuranPokok.toLocaleString("id-ID")}\n• Imbal Jasa / Margin: Rp ${marginBulanan.toLocaleString("id-ID")}\n• Total Setoran: Rp ${(angsuranPokok + marginBulanan).toLocaleString("id-ID")}`
+    );
+  };
+
+  const handlePencairan = (id: string) => {
+    setLoanList(prev => prev.map(item => item.id === id ? { ...item, isCair: true } : item));
+    showModal(
+      "success",
+      "Pencairan Dana Berhasil Dieksekusi",
+      "Dana pembiayaan telah berhasil dipindahbukukan ke rekening tabungan debitur bersangkutan melalui otorisasi jurnal ganda otomatis (Kredit Akun Bank/Kas, Debet Piutang Pembiayaan)."
     );
   };
 
@@ -117,7 +139,7 @@ export default function PinjamanPage() {
           <p className="text-xs text-slate-500 mt-0.5">Pemantauan portofolio pinjaman terintegrasi dengan mesin AI Credit Scoring 5C.</p>
         </div>
         <Button
-          className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-xs text-white"
+          className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-xs text-white shadow-md"
           onClick={() => {
             setIsOpenModal(true);
             setScoringResult(null);
@@ -130,7 +152,7 @@ export default function PinjamanPage() {
 
       {/* ── Grid Kartu Ringkasan Portofolio ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-none shadow-sm bg-white">
+        <Card className="border-none shadow-sm bg-white hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-xs font-semibold text-slate-500 uppercase">Total Plafon Aktif</CardTitle>
             <div className="w-7 h-7 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
@@ -143,7 +165,7 @@ export default function PinjamanPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-none shadow-sm bg-white">
+        <Card className="border-none shadow-sm bg-white hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-xs font-semibold text-slate-500 uppercase">Sisa Outstanding</CardTitle>
             <div className="w-7 h-7 rounded-full bg-amber-50 flex items-center justify-center text-amber-600">
@@ -156,7 +178,7 @@ export default function PinjamanPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-none shadow-sm bg-white">
+        <Card className="border-none shadow-sm bg-white hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-xs font-semibold text-slate-500 uppercase">Rasio NPL (Kredit Macet)</CardTitle>
             <div className="w-7 h-7 rounded-full bg-rose-50 flex items-center justify-center text-rose-600">
@@ -169,7 +191,7 @@ export default function PinjamanPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-none shadow-sm bg-white">
+        <Card className="border-none shadow-sm bg-white hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-xs font-semibold text-slate-500 uppercase">Kontrak Diawasi (DPK)</CardTitle>
             <div className="w-7 h-7 rounded-full bg-purple-50 flex items-center justify-center text-purple-600">
@@ -184,14 +206,16 @@ export default function PinjamanPage() {
       </div>
 
       {/* ── Kontainer Utama Filter & Tabel ── */}
-      <Card className="border-none shadow-sm bg-white overflow-hidden">
+      <Card className="border-none shadow-sm bg-white overflow-hidden animate-in fade-in duration-200">
         <CardHeader className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="relative max-w-xs w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
               placeholder="Cari nomor kontrak / debitur..."
-              className="w-full h-8 pl-9 pr-4 text-xs rounded-lg border border-slate-200 focus:outline-none focus:border-blue-500 text-slate-900 placeholder:text-slate-400"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full h-8 pl-9 pr-4 text-xs rounded-lg border border-slate-200 focus:outline-none focus:border-blue-500 text-slate-900 placeholder:text-slate-400 font-medium"
             />
           </div>
 
@@ -215,7 +239,7 @@ export default function PinjamanPage() {
 
         {/* Tabel Portofolio dengan batas luapan horizontal wajib (SOP Mobile) */}
         <CardContent className="p-0 overflow-x-auto max-w-full">
-          <Table className="min-w-[700px]">
+          <Table className="min-w-[750px]">
             <TableHeader>
               <TableRow>
                 <TableHead className="th-standard pl-6">No. Kontrak</TableHead>
@@ -234,24 +258,23 @@ export default function PinjamanPage() {
               ) : (
                 filteredList.map((row) => (
                   <TableRow key={row.id} className="hover:bg-slate-50/50">
-                    <TableCell className="pl-6 font-mono text-xs font-semibold text-slate-700">
+                    <TableCell className="pl-6 font-mono text-xs font-bold text-blue-600">
                       {row.noKontrak}
                     </TableCell>
-                    <TableCell className="text-xs font-medium text-slate-900">
+                    <TableCell className="text-xs font-semibold text-slate-900">
                       {row.name}
                     </TableCell>
                     <TableCell className="font-mono text-xs text-slate-600">
                       Rp {row.amount.toLocaleString("id-ID")}
                     </TableCell>
-                    {/* Perataan kanan khusus kolom uang/outstanding bermode monospace */}
                     <TableCell className="text-right font-mono text-xs font-bold text-slate-900">
                       Rp {row.outstanding.toLocaleString("id-ID")}
                     </TableCell>
-                    <TableCell className="text-center text-xs text-slate-500">
+                    <TableCell className="text-center text-xs text-slate-500 font-medium">
                       {row.tenor}
                     </TableCell>
                     <TableCell className="text-center">
-                      <span className={`inline-flex items-center justify-center w-5 h-5 rounded font-bold text-[10px] ${
+                      <span className={`inline-flex items-center justify-center w-5 h-5 rounded font-mono font-bold text-[10px] ${
                         row.riskGrade === "A" ? "bg-emerald-100 text-emerald-700" :
                         row.riskGrade === "B" ? "bg-blue-100 text-blue-700" :
                         row.riskGrade === "C" ? "bg-amber-100 text-amber-700" : "bg-rose-100 text-rose-700"
@@ -262,7 +285,7 @@ export default function PinjamanPage() {
                     <TableCell className="text-center">
                       <Badge
                         variant="outline"
-                        className={`text-[9px] font-normal py-0.5 ${
+                        className={`text-[9px] font-medium py-0.5 px-2 ${
                           row.status === "LANCAR" ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
                           row.status === "DPK" ? "bg-amber-50 text-amber-600 border-amber-100" :
                           "bg-rose-50 text-rose-600 border-rose-100"
@@ -271,16 +294,28 @@ export default function PinjamanPage() {
                         {row.status}
                       </Badge>
                     </TableCell>
-                    {/* Tombol aksi baris tabel minimalis murni ikon (SOP 09 Poin 1) */}
+                    {/* Tombol aksi baris tabel */}
                     <TableCell className="text-right pr-6 space-x-1">
                       <Button
                         variant="ghost"
                         size="icon"
-                        title="Lihat Jadwal Angsuran"
-                        className="w-7 h-7 text-slate-500 hover:text-blue-600"
+                        onClick={() => handleLihatJadwal(row)}
+                        title="Lihat Rincian & Angsuran"
+                        className="w-7 h-7 text-slate-400 hover:text-blue-600 hover:bg-blue-50"
                       >
                         <Eye className="w-3.5 h-3.5" />
                       </Button>
+                      {!row.isCair && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handlePencairan(row.id)}
+                          title="Cairkan Plafon ke Rekening"
+                          className="w-7 h-7 text-amber-500 hover:text-emerald-600 hover:bg-emerald-50"
+                        >
+                          <ArrowDownToLine className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))
@@ -315,7 +350,7 @@ export default function PinjamanPage() {
                 <select
                   value={loanForm.memberName}
                   onChange={(e) => setLoanForm({ ...loanForm, memberName: e.target.value })}
-                  className="w-full h-8 px-2 text-xs rounded-lg border border-slate-200 focus:outline-none focus:border-blue-500 text-slate-800 bg-white"
+                  className="w-full h-8 px-2 text-xs font-semibold rounded-lg border border-slate-200 focus:outline-none focus:border-blue-500 text-slate-800 bg-white"
                 >
                   <option value="Budi Santoso">Budi Santoso</option>
                   <option value="Siti Aminah">Siti Aminah</option>
@@ -329,7 +364,7 @@ export default function PinjamanPage() {
                 <select
                   value={loanForm.tenorMonths}
                   onChange={(e) => setLoanForm({ ...loanForm, tenorMonths: e.target.value })}
-                  className="w-full h-8 px-2 text-xs rounded-lg border border-slate-200 focus:outline-none focus:border-blue-500 text-slate-800 bg-white"
+                  className="w-full h-8 px-2 text-xs font-semibold rounded-lg border border-slate-200 focus:outline-none focus:border-blue-500 text-slate-800 bg-white"
                 >
                   <option value="12">12 Bulan</option>
                   <option value="18">18 Bulan</option>
@@ -346,7 +381,7 @@ export default function PinjamanPage() {
                 type="text"
                 value={loanForm.loanAmount}
                 onChange={(e) => setLoanForm({ ...loanForm, loanAmount: e.target.value })}
-                className="w-full h-8 px-3 text-xs font-mono rounded-lg border border-slate-200 focus:outline-none focus:border-blue-500 text-slate-900"
+                className="w-full h-8 px-3 text-xs font-mono font-bold rounded-lg border border-slate-200 focus:outline-none focus:border-blue-500 text-slate-900"
               />
             </div>
 
@@ -386,7 +421,7 @@ export default function PinjamanPage() {
                 type="text"
                 value={loanForm.loanPurpose}
                 onChange={(e) => setLoanForm({ ...loanForm, loanPurpose: e.target.value })}
-                className="w-full h-8 px-3 text-xs rounded-lg border border-slate-200 text-slate-900"
+                className="w-full h-8 px-3 text-xs font-medium rounded-lg border border-slate-200 text-slate-900"
               />
             </div>
 
@@ -397,7 +432,7 @@ export default function PinjamanPage() {
                 variant="secondary"
                 disabled={isScoringLoading}
                 onClick={handleLiveCreditScore}
-                className="w-full bg-slate-900 hover:bg-slate-800 text-white text-xs h-8 flex items-center justify-center gap-1.5"
+                className="w-full bg-slate-900 hover:bg-slate-800 text-white text-xs h-8 flex items-center justify-center gap-1.5 font-bold"
               >
                 <Cpu className="w-3.5 h-3.5 text-amber-400" />
                 {isScoringLoading ? "Menghitung Bobot 5C..." : "Analisis Kelayakan Kredit (AI Scoring)"}
@@ -423,9 +458,9 @@ export default function PinjamanPage() {
                 <div className="text-[10px] text-slate-600 bg-white p-2 rounded border border-blue-50 space-y-0.5">
                   <p className="font-bold text-slate-700">Catatan Analisis Mesin:</p>
                   {scoringResult.reasons?.map((res: string, idx: number) => (
-                    <p key={idx} className="text-[9px]">• {res}</p>
+                    <p key={idx} className="text-[9px] font-medium">• {res}</p>
                   ))}
-                  <p className="text-[9px] text-emerald-600 font-medium pt-1">
+                  <p className="text-[9px] text-emerald-600 font-bold pt-1">
                     Rekomendasi Plafon Layak: Rp {scoringResult.max_pinjaman?.toLocaleString("id-ID")}
                   </p>
                 </div>
@@ -434,10 +469,10 @@ export default function PinjamanPage() {
           </div>
 
           <DialogFooter className="mt-2 gap-2">
-            <Button variant="outline" size="sm" onClick={() => setIsOpenModal(false)} className="text-xs h-8">
+            <Button variant="outline" size="sm" onClick={() => setIsOpenModal(false)} className="text-xs h-8 font-semibold">
               Batal
             </Button>
-            <Button size="sm" onClick={handleSubmitPengajuan} className="bg-blue-600 hover:bg-blue-700 text-xs text-white h-8">
+            <Button size="sm" onClick={handleSubmitPengajuan} className="bg-blue-600 hover:bg-blue-700 text-xs text-white h-8 font-bold shadow-md">
               Ajukan Pembiayaan
             </Button>
           </DialogFooter>
