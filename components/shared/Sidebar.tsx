@@ -8,18 +8,18 @@ import {
   LayoutDashboard,
   Users,
   WalletCards,
-  FileSpreadsheet,
   Coins,
   Menu,
   X,
   CreditCard,
-  Sliders,
   ShieldCheck,
   Building,
   TrendingUp,
   Package,
   UserCog,
   MapPin,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getPengaturanSistemAction } from "@/actions/pengaturan-action";
@@ -32,7 +32,7 @@ interface SidebarProps {
 
 /**
  * Sidebar — Bilah navigasi samping yang adaptif dan mendukung usapan seluler.
- * Terhubung dengan rute riil Koperasi-AI Core dan memaparkan nama entitas dinamis.
+ * Terhubung dengan rute riil Koperasi-AI Core, mendukung pengelompokan menu (Collapsible/Expandable).
  */
 export function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
   const pathname = usePathname();
@@ -46,6 +46,13 @@ export function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
     cabangCount: 2,
   });
 
+  // State untuk melacak grup mana yang dalam kondisi Expand (Terbuka) / Collapse (Tertutup)
+  const [openGroups, setOpenGroups] = useState<{ [key: string]: boolean }>({
+    "Layanan Utama": true,
+    "Keuangan & Laporan": true,
+    "Sistem & Manajemen": true,
+  });
+
   // Tarik nama koperasi riil dari pangkalan data peladen
   useEffect(() => {
     async function fetchMeta() {
@@ -57,52 +64,78 @@ export function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
     fetchMeta();
   }, []);
 
-  // Pemetaan rujukan rute navigasi yang selaras dengan seluruh modul sistem
-  const links = [
-    { name: "Dashboard Utama", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Kasir / Teller", href: "/teller", icon: Coins },
-    { name: "Keanggotaan & OCR", href: "/anggota", icon: Users },
-    { 
-      name: "Rekening Simpanan", 
-      href: "/simpanan", 
-      icon: WalletCards,
-      badge: liveIndicators.simpananCount 
+  const toggleGroup = (groupName: string) => {
+    setOpenGroups((prev) => ({
+      ...prev,
+      [groupName]: !prev[groupName],
+    }));
+  };
+
+  // Struktur Navigasi Berkelompok
+  const menuGroups = [
+    {
+      name: "Layanan Utama",
+      items: [
+        { name: "Dashboard Utama", href: "/dashboard", icon: LayoutDashboard },
+        { name: "Kasir / Teller", href: "/teller", icon: Coins },
+        { name: "Keanggotaan & OCR", href: "/anggota", icon: Users },
+      ],
     },
-    { 
-      name: "Kredit & Pinjaman AI", 
-      href: "/pinjaman", 
-      icon: CreditCard,
-      badge: liveIndicators.pinjamanCount,
-      badgeColor: "bg-amber-500/20 text-amber-400 border border-amber-500/30" 
+    {
+      name: "Keuangan & Laporan",
+      items: [
+        { 
+          name: "Rekening Simpanan", 
+          href: "/simpanan", 
+          icon: WalletCards,
+          badge: liveIndicators.simpananCount 
+        },
+        { 
+          name: "Kredit & Pinjaman AI", 
+          href: "/pinjaman", 
+          icon: CreditCard,
+          badge: liveIndicators.pinjamanCount,
+          badgeColor: "bg-amber-500/20 text-amber-400 border border-amber-500/30" 
+        },
+        { 
+          name: "Laporan Akuntansi & SHU", 
+          href: "/laporan", 
+          icon: TrendingUp 
+        },
+      ],
     },
-    { name: "Laporan Akuntansi & SHU", href: "/laporan", icon: TrendingUp },
-    { 
-      name: "Pengaturan Produk", 
-      href: "/produk", 
-      icon: Package,
-      badge: liveIndicators.produkCount,
-      badgeColor: "bg-purple-500/20 text-purple-400 border border-purple-500/30"
-    },
-    { 
-      name: "Manajemen User", 
-      href: "/users", 
-      icon: UserCog,
-      badge: liveIndicators.userCount,
-      badgeColor: "bg-blue-500/20 text-blue-400 border border-blue-500/30"
-    },
-    { 
-      name: "Manajemen Cabang", 
-      href: "/cabang", 
-      icon: MapPin,
-      badge: liveIndicators.cabangCount,
-      badgeColor: "bg-rose-500/20 text-rose-400 border border-rose-500/30"
-    },
-    { 
-      name: "Pengaturan & Audit Trail", 
-      href: "/pengaturan", 
-      icon: ShieldCheck,
-      badge: liveIndicators.auditLogCount,
-      badgeColor: "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+    {
+      name: "Sistem & Manajemen",
+      items: [
+        { 
+          name: "Pengaturan Produk", 
+          href: "/produk", 
+          icon: Package,
+          badge: liveIndicators.produkCount,
+          badgeColor: "bg-purple-500/20 text-purple-400 border border-purple-500/30"
+        },
+        { 
+          name: "Manajemen User", 
+          href: "/users", 
+          icon: UserCog,
+          badge: liveIndicators.userCount,
+          badgeColor: "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+        },
+        { 
+          name: "Manajemen Cabang", 
+          href: "/cabang", 
+          icon: MapPin,
+          badge: liveIndicators.cabangCount,
+          badgeColor: "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+        },
+        { 
+          name: "Pengaturan & Audit Trail", 
+          href: "/pengaturan", 
+          icon: ShieldCheck,
+          badge: liveIndicators.auditLogCount,
+          badgeColor: "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+        },
+      ],
     },
   ];
 
@@ -153,41 +186,66 @@ export function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
           </span>
         </div>
 
-        {/* Tautan Navigasi Dinamis */}
-        <nav className="flex-1 px-3 py-4 space-y-1.5 overflow-y-auto">
-          <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider px-3 block mb-2">
-            Modul Operasional
-          </span>
-          {links.map((link) => {
-            const Icon = link.icon;
-            // Padankan jika path saat ini diawali dengan link.href
-            const isActive = pathname === link.href || pathname.startsWith(`${link.href}/`);
+        {/* Daftar Navigasi Berkelompok */}
+        <nav className="flex-1 px-3 py-3 space-y-4 overflow-y-auto">
+          {menuGroups.map((group) => {
+            const isGroupOpen = openGroups[group.name];
+
             return (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={onClose}
-                className={cn(
-                  "flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all touch-min relative group",
-                  isActive
-                    ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md shadow-blue-600/20"
-                    : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-100"
+              <div key={group.name} className="space-y-1">
+                {/* Header Grup Collapsible */}
+                <button
+                  onClick={() => toggleGroup(group.name)}
+                  className="flex items-center justify-between w-full px-3 py-1.5 text-[10px] font-bold text-slate-400 hover:text-slate-200 uppercase tracking-wider transition-colors rounded-lg hover:bg-slate-800/30"
+                  aria-expanded={isGroupOpen}
+                >
+                  <span>{group.name}</span>
+                  {isGroupOpen ? (
+                    <ChevronDown className="w-3.5 h-3.5 text-slate-500 transition-transform" />
+                  ) : (
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-500 transition-transform" />
+                  )}
+                </button>
+
+                {/* Senarai Item di dalam Grup */}
+                {isGroupOpen && (
+                  <div className="space-y-1 animate-in fade-in-50 duration-200">
+                    {group.items.map((link) => {
+                      const Icon = link.icon;
+                      // Padankan jika path saat ini diawali dengan link.href
+                      const isActive = pathname === link.href || pathname.startsWith(`${link.href}/`);
+
+                      return (
+                        <Link
+                          key={link.href}
+                          href={link.href}
+                          onClick={onClose}
+                          className={cn(
+                            "flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all touch-min relative group",
+                            isActive
+                              ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md shadow-blue-600/20"
+                              : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-100"
+                          )}
+                        >
+                          <div className="flex items-center gap-3 truncate">
+                            <Icon className={cn("w-4 h-4 shrink-0 transition-transform group-hover:scale-110", isActive ? "text-white" : "text-slate-400")} />
+                            <span className="truncate">{link.name}</span>
+                          </div>
+                          {link.badge && (
+                            <span className={cn(
+                              "text-[9px] px-1.5 py-0.5 rounded-md font-bold font-mono shrink-0",
+                              link.badgeColor || "bg-blue-500/20 text-blue-300 border border-blue-500/30",
+                              isActive && "bg-white/20 text-white border-transparent"
+                            )}>
+                              {link.badge}
+                            </span>
+                          )}
+                        </Link>
+                      );
+                    })}
+                  </div>
                 )}
-              >
-                <div className="flex items-center gap-3">
-                  <Icon className={cn("w-4 h-4 shrink-0 transition-transform group-hover:scale-110", isActive ? "text-white" : "text-slate-400")} />
-                  <span>{link.name}</span>
-                </div>
-                {link.badge && (
-                  <span className={cn(
-                    "text-[9px] px-1.5 py-0.5 rounded-md font-bold font-mono shrink-0",
-                    link.badgeColor || "bg-blue-500/20 text-blue-300 border border-blue-500/30",
-                    isActive && "bg-white/20 text-white border-transparent"
-                  )}>
-                    {link.badge}
-                  </span>
-                )}
-              </Link>
+              </div>
             );
           })}
         </nav>
