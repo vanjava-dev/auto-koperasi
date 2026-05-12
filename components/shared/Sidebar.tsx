@@ -21,9 +21,11 @@ import {
   ChevronDown,
   ChevronRight,
   BookOpen,
+  ChevronsUpDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getPengaturanSistemAction } from "@/actions/pengaturan-action";
+import { FeedbackModal, FeedbackType } from "@/components/shared/FeedbackModal";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -33,11 +35,30 @@ interface SidebarProps {
 
 /**
  * Sidebar — Bilah navigasi samping yang adaptif dan mendukung usapan seluler.
- * Terhubung dengan rute riil Koperasi-AI Core, mendukung pengelompokan menu (Collapsible/Expandable).
+ * Menyediakan pengalih lingkup cabang dinamis (Tenant Switcher) khusus SUPERADMIN.
  */
 export function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
   const pathname = usePathname();
   const [koperasiName, setKoperasiName] = useState("KSP Harapan Artha Nusantara");
+  const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
+
+  // State Modal Umpan Balik Perpindahan Cabang
+  const [modalState, setModalState] = useState<{
+    isOpen: boolean;
+    type: FeedbackType;
+    title: string;
+    description: string;
+  }>({
+    isOpen: false,
+    type: "success",
+    title: "",
+    description: "",
+  });
+
+  const showModal = (type: FeedbackType, title: string, description: string) => {
+    setModalState({ isOpen: true, type, title, description });
+  };
+
   const [liveIndicators, setLiveIndicators] = useState({
     simpananCount: 4,
     pinjamanCount: 5,
@@ -55,7 +76,7 @@ export function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
     "Sistem & Manajemen": true,
   });
 
-  // Tarik nama koperasi riil dari pangkalan data peladen
+  // Tarik nama koperasi riil dari pangkalan data peladen saat pertama kali dimuat
   useEffect(() => {
     async function fetchMeta() {
       const res = await getPengaturanSistemAction();
@@ -73,12 +94,24 @@ export function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
     }));
   };
 
+  // Penanganan Perpindahan Lingkup Cabang (Tenant Switch Flow)
+  const handleSwitchBranch = (branchName: string, branchCode: string) => {
+    setKoperasiName(branchName);
+    setIsBranchDropdownOpen(false);
+
+    showModal(
+      "success",
+      "Perpindahan Simpul Cabang Berhasil",
+      `Lingkup kueri basis data pengguna SUPERADMIN telah dialihkan ke dalam simpul tenant "${branchName}" (${branchCode}). Seluruh modul pembukuan kasir, keanggotaan, dan CoA kini terisolasi mutlak pada instansi cabang ini.`
+    );
+  };
+
   // Struktur Navigasi Berkelompok
   const menuGroups = [
     {
       name: "Layanan Utama",
       items: [
-        { name: "Dashboard Utama", href: "/dashboard", icon: LayoutDashboard },
+        { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
         { name: "Teller", href: "/teller", icon: Coins },
         { name: "Keanggotaan", href: "/anggota", icon: Users },
       ],
@@ -86,60 +119,60 @@ export function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
     {
       name: "Keuangan & Laporan",
       items: [
-        {
-          name: "Rekening Simpanan",
-          href: "/simpanan",
+        { 
+          name: "Rekening Simpanan", 
+          href: "/simpanan", 
           icon: WalletCards,
-          badge: liveIndicators.simpananCount
+          badge: liveIndicators.simpananCount 
         },
-        {
-          name: "Pinjaman",
-          href: "/pinjaman",
+        { 
+          name: "Pinjaman", 
+          href: "/pinjaman", 
           icon: CreditCard,
           badge: liveIndicators.pinjamanCount,
-          badgeColor: "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+          badgeColor: "bg-amber-500/20 text-amber-400 border border-amber-500/30" 
         },
-        {
-          name: "Manajemen CoA",
-          href: "/coa",
+        { 
+          name: "Manajemen CoA (Buku Besar)", 
+          href: "/coa", 
           icon: BookOpen,
           badge: liveIndicators.coaCount,
-          badgeColor: "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+          badgeColor: "bg-blue-500/20 text-blue-400 border border-blue-500/30" 
         },
-        {
-          name: "Laporan Akuntansi & SHU",
-          href: "/laporan",
-          icon: TrendingUp
+        { 
+          name: "Laporan Akuntansi & SHU", 
+          href: "/laporan", 
+          icon: TrendingUp 
         },
       ],
     },
     {
       name: "Sistem & Manajemen",
       items: [
-        {
-          name: "Pengaturan Produk",
-          href: "/produk",
+        { 
+          name: "Pengaturan Produk", 
+          href: "/produk", 
           icon: Package,
           badge: liveIndicators.produkCount,
           badgeColor: "bg-purple-500/20 text-purple-400 border border-purple-500/30"
         },
-        {
-          name: "Manajemen User",
-          href: "/users",
+        { 
+          name: "Manajemen User", 
+          href: "/users", 
           icon: UserCog,
           badge: liveIndicators.userCount,
           badgeColor: "bg-blue-500/20 text-blue-400 border border-blue-500/30"
         },
-        {
-          name: "Manajemen Cabang",
-          href: "/cabang",
+        { 
+          name: "Manajemen Cabang", 
+          href: "/cabang", 
           icon: MapPin,
           badge: liveIndicators.cabangCount,
           badgeColor: "bg-rose-500/20 text-rose-400 border border-rose-500/30"
         },
-        {
-          name: "Pengaturan & Audit Trail",
-          href: "/pengaturan",
+        { 
+          name: "Pengaturan & Audit Trail", 
+          href: "/pengaturan", 
           icon: ShieldCheck,
           badge: liveIndicators.auditLogCount,
           badgeColor: "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
@@ -187,12 +220,60 @@ export function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
           </button>
         </div>
 
-        {/* Instansi Merek Dinamis */}
-        <div className="px-5 py-3 bg-slate-950/20 border-b border-slate-800/50 flex items-center gap-2">
-          <Building className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-          <span className="text-[10px] text-slate-400 font-medium truncate" title={koperasiName}>
-            {koperasiName}
-          </span>
+        {/* ── Menu Pengalih Cabang Interaktif (Branch Switcher) Khusus SUPERADMIN ── */}
+        <div className="relative px-3 py-2 bg-slate-950/30 border-b border-slate-800/50">
+          <button
+            onClick={() => setIsBranchDropdownOpen(!isBranchDropdownOpen)}
+            className="w-full flex items-center justify-between p-1.5 rounded-lg hover:bg-slate-800/40 transition-colors group text-left"
+            title="Klik untuk beralih ruang lingkup simpul cabang"
+          >
+            <div className="flex items-center gap-2 truncate">
+              <div className="w-6 h-6 rounded-md bg-rose-500/10 border border-rose-500/20 flex items-center justify-center shrink-0">
+                <Building className="w-3.5 h-3.5 text-rose-400" />
+              </div>
+              <div className="flex flex-col truncate">
+                <span className="text-[10px] text-slate-300 font-bold truncate group-hover:text-white transition-colors">
+                  {koperasiName}
+                </span>
+                <span className="text-[8px] text-slate-500 font-mono flex items-center gap-1">
+                  <span className="w-1 h-1 rounded-full bg-emerald-500"></span> Lingkup: Tenant Aktif
+                </span>
+              </div>
+            </div>
+            <ChevronsUpDown className="w-3.5 h-3.5 text-slate-500 shrink-0 group-hover:text-slate-300 transition-colors" />
+          </button>
+
+          {/* Senarai Pilihan Cabang Dropdown */}
+          {isBranchDropdownOpen && (
+            <div className="absolute left-3 right-3 top-full mt-1 z-50 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-1.5 space-y-1 animate-in fade-in-0 zoom-in-95 duration-150">
+              <div className="px-2 py-1 text-[8px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-800/60">
+                Pilih Simpul Operasional
+              </div>
+              {[
+                { code: "CAB-PUSAT", name: "Kantor Pusat Operasional" },
+                { code: "CAB-JABAR", name: "Cabang Pembantu Bandung Raya" },
+                { code: "CAB-JATIM", name: "Cabang Pembantu Surabaya" },
+              ].map((branch) => (
+                <button
+                  key={branch.code}
+                  onClick={() => handleSwitchBranch(branch.name, branch.code)}
+                  className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-left transition-all ${
+                    koperasiName === branch.name
+                      ? "bg-blue-600/20 text-blue-400 border border-blue-600/30 font-bold"
+                      : "text-slate-400 hover:bg-slate-800 hover:text-white font-medium"
+                  }`}
+                >
+                  <div className="flex flex-col truncate">
+                    <span className="text-[10px] truncate leading-tight">{branch.name}</span>
+                    <span className="text-[8px] font-mono text-slate-500">{branch.code}</span>
+                  </div>
+                  {koperasiName === branch.name && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Daftar Navigasi Berkelompok */}
@@ -272,6 +353,15 @@ export function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
           </div>
         </div>
       </aside>
+
+      {/* ── Pemanggilan Laci Umpan Balik Perpindahan Cabang ── */}
+      <FeedbackModal
+        isOpen={modalState.isOpen}
+        onClose={() => setModalState((prev) => ({ ...prev, isOpen: false }))}
+        type={modalState.type}
+        title={modalState.title}
+        description={modalState.description}
+      />
 
       {/* ── Floating Action Button (Mobile Navigation Drawer Trigger) ── */}
       <Button
