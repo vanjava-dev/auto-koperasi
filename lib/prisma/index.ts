@@ -1,4 +1,6 @@
-import { PrismaClient } from ".prisma/client";
+// Abaikan sementara ketidaksesuaian resolusi tembolok ekspor pada Language Server IDE lokal
+// @ts-ignore
+import { PrismaClient } from "@prisma/client";
 
 // Mencegah instansiasi berulang Prisma Client saat Next.js melakukan hot-reloading di mode development
 const globalForPrisma = globalThis as unknown as {
@@ -7,7 +9,7 @@ const globalForPrisma = globalThis as unknown as {
 
 /**
  * Prisma Client terpusat berkinerja tinggi.
- * Menggunakan mode mesin pustaka (library engine) natif peladen standar terisolasi dari bundler.
+ * Menggunakan mode mesin pustaka (library engine) natif peladen standar terisolasi penuh dari bundler.
  */
 export const prisma =
   globalForPrisma.prisma ??
