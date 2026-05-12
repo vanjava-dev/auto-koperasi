@@ -5,7 +5,6 @@ import { defineConfig } from "@prisma/config";
  * Mematuhi arsitektur pemisahan Datasource URL terbaru.
  */
 export default defineConfig({
-  earlyAccess: true,
   schema: "prisma/schema.prisma",
   migrate: {
     connectionString: process.env.DATABASE_URL,
