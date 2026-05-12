@@ -7,7 +7,7 @@ const globalForPrisma = globalThis as unknown as {
 
 /**
  * Prisma Client terpusat berkinerja tinggi.
- * Siap melayani pemanggilan langsung di Server Components dan Server Actions.
+ * Menggunakan mode mesin pustaka (library engine) natif peladen standar.
  */
 export const prisma =
   globalForPrisma.prisma ??
