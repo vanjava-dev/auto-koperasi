@@ -50,10 +50,10 @@ export default function PengaturanPage() {
         setConfigForm((prev) => ({
           ...prev,
           koperasiName: res.data.koperasiName || prev.koperasiName,
-          simpananBungaPct: res.data.simpananBungaPct.toString(),
-          pinjamanMarginPct: res.data.pinjamanMarginPct.toString(),
-          dendaHariPct: res.data.dendaHariPct.toString(),
-          maxPinjamanCount: res.data.maxPinjamanCount.toString(),
+          simpananBungaPct: res.data.simpananBungaPct?.toString() ?? "4.5",
+          pinjamanMarginPct: res.data.pinjamanMarginPct?.toString() ?? "12.0",
+          dendaHariPct: res.data.dendaHariPct?.toString() ?? "0.1",
+          maxPinjamanCount: res.data.maxPinjamanCount?.toString() ?? "2",
         }));
       }
     }
