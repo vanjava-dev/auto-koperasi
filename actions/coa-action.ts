@@ -51,10 +51,13 @@ export async function getCoaListAction() {
       orderBy: { kodeAkun: "asc" },
     });
 
-    // 3. Jika kosong, lakukan injeksi seeding awal otomatis
-    if (coaList.length === 0) {
+    // 3. Periksa akun-akun standar yang belum terdaftar pada database
+    const existingCodes = new Set(coaList.map(c => c.kodeAkun));
+    const missingSeeds = DEFAULT_COA_SEED.filter(seed => !existingCodes.has(seed.kodeAkun));
+
+    if (missingSeeds.length > 0) {
       await prisma.$transaction(async (tx) => {
-        for (const seed of DEFAULT_COA_SEED) {
+        for (const seed of missingSeeds) {
           await tx.chartOfAccount.create({
             data: {
               koperasiId: koperasi!.id,
@@ -66,7 +69,7 @@ export async function getCoaListAction() {
           });
         }
 
-        // Catat stempel audit injeksi awal
+        // Catat stempel audit injeksi sinkronisasi
         await tx.auditLog.create({
           data: {
             userId: null,
@@ -74,12 +77,12 @@ export async function getCoaListAction() {
             action: "SEED_CHART_OF_ACCOUNTS",
             entityType: "COA",
             entityId: koperasi!.id,
-            details: `Injeksi otomatis ${DEFAULT_COA_SEED.length} pos akun utama (Aset, Kewajiban, Ekuitas, Pendapatan, Beban) berhasil diselesaikan.`,
+            details: `Sinkronisasi otomatis menyisipkan ${missingSeeds.length} pos akun master standar yang belum terdaftar selesai dieksekusi.`,
           },
         });
       });
 
-      // Muat ulang setelah di-seeding
+      // Muat ulang setelah sinkronisasi
       coaList = await prisma.chartOfAccount.findMany({
         where: { koperasiId: koperasi.id },
         orderBy: { kodeAkun: "asc" },
