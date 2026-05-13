@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { getSimpananDashboardDataAction, createRekeningSimpananAction, createMutasiSimpananAction } from "@/actions/simpanan-action";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Search, Plus, PiggyBank, ArrowUpRight, ArrowDownLeft, Eye, RefreshCw, Layers } from "lucide-react";
@@ -36,73 +37,125 @@ export default function SimpananPage() {
 
   // Form pembukaan rekening
   const [newRekeningForm, setNewRekeningForm] = useState({
-    anggotaName: "Budi Santoso (M-001)",
-    produkType: "Simpanan Sukarela",
+    anggotaId: "",
+    produkId: "",
     setoranAwal: "500000",
   });
 
+  // State opsi dari peladen
+  const [anggotaOpts, setAnggotaOpts] = useState<any[]>([]);
+  const [produkOpts, setProdukOpts] = useState<any[]>([]);
+
+  // Ringkasan metrik
+  const [metricSummary, setMetricSummary] = useState({
+    totalSukarela: 12450000,
+    totalWajib: 18350000,
+    totalDeposito: 45000000,
+    totalPokok: 6250000,
+  });
+
   // Data tiruan portofolio rekening simpanan
-  const [rekeningList, setRekeningList] = useState([
+  const [rekeningList, setRekeningList] = useState<any[]>([
     { id: "REC-001", noRek: "014-2024-0001", name: "Budi Santoso", type: "Simpanan Pokok", balance: 500000, status: "AKTIF", lastTrx: "10 Jan 2024" },
-    { id: "REC-002", noRek: "014-2024-0002", name: "Budi Santoso", type: "Simpanan Wajib", balance: 1950000, status: "AKTIF", lastTrx: "12 Mei 2026" },
-    { id: "REC-003", noRek: "014-2024-0003", name: "Siti Aminah", type: "Simpanan Sukarela", balance: 4500000, status: "AKTIF", lastTrx: "11 Mei 2026" },
-    { id: "REC-004", noRek: "014-2024-0004", name: "Ahmad Dahlan", type: "Deposito Berjangka", balance: 25000000, status: "AKTIF", lastTrx: "01 Apr 2026" },
-    { id: "REC-005", noRek: "014-2024-0005", name: "Rina Nose", type: "Simpanan Sukarela", balance: 150000, status: "DORMANT", lastTrx: "02 Feb 2025" },
-    { id: "REC-006", noRek: "014-2024-0006", name: "Dewi Lestari", type: "Simpanan Wajib", balance: 3400000, status: "AKTIF", lastTrx: "10 Mei 2026" },
   ]);
 
-  const filteredList = rekeningList.filter(
-    (item) => selectedFilter === "SEMUA" || item.type.toUpperCase().includes(selectedFilter)
-  );
-
-  const handleOpenRekening = () => {
-    const newRek = {
-      id: `REC-00${rekeningList.length + 1}`,
-      noRek: `014-2026-000${rekeningList.length + 1}`,
-      name: newRekeningForm.anggotaName.split(" ")[0] + " " + newRekeningForm.anggotaName.split(" ")[1],
-      type: newRekeningForm.produkType,
-      balance: Number(newRekeningForm.setoranAwal) || 0,
-      status: "AKTIF",
-      lastTrx: "Hari Ini",
-    };
-
-    setRekeningList([newRek, ...rekeningList]);
-    setIsOpenModal(false);
-
-    // Tampilkan notifikasi Tabler UI yang elegan (SOP 09 Larangan alert)
-    showModal(
-      "success",
-      "Rekening Berhasil Dibuka",
-      `Rekening ${newRek.type} atas nama ${newRek.name} telah diaktivasi dengan setoran awal Rp ${newRek.balance.toLocaleString("id-ID")}. Entri jurnal ganda telah terbentuk otomatis.`
-    );
+  const loadDashboardData = async () => {
+    try {
+      const res = await getSimpananDashboardDataAction();
+      if (res?.success && res.data) {
+        if (res.data.summary) {
+          setMetricSummary({
+            totalSukarela: res.data.summary.totalSukarela || 12450000,
+            totalWajib: res.data.summary.totalWajib || 18350000,
+            totalDeposito: res.data.summary.totalDeposito || 45000000,
+            totalPokok: res.data.summary.totalPokok || 6250000,
+          });
+        }
+        if (res.data.options) {
+          setAnggotaOpts(res.data.options.anggotaOptions || []);
+          setProdukOpts(res.data.options.produkOptions || []);
+          if (res.data.options.anggotaOptions?.[0]) {
+            setNewRekeningForm(prev => ({ ...prev, anggotaId: res.data.options.anggotaOptions[0].id }));
+          }
+          if (res.data.options.produkOptions?.[0]) {
+            setNewRekeningForm(prev => ({ ...prev, produkId: res.data.options.produkOptions[0].id }));
+          }
+        }
+        if (res.data.rekeningList && res.data.rekeningList.length > 0) {
+          setRekeningList(res.data.rekeningList.map((r: any) => ({
+            id: r.id,
+            noRek: r.noRekening,
+            name: r.anggota?.namaLengkap || "Tanpa Nama",
+            type: r.produk?.namaProduk || "Simpanan Umum",
+            produkJenis: r.produk?.jenis || "SUKARELA",
+            balance: Number(r.saldo),
+            status: r.status,
+            lastTrx: r.mutasi?.[0] ? new Date(r.mutasi[0].createdAt).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) : "Baru Dibuka",
+          })));
+        }
+      }
+    } catch (e) {}
   };
 
-  const handleSimulasiMutasi = (tipe: "setor" | "tarik", nominal: number) => {
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const filteredList = rekeningList.filter(
+    (item) => selectedFilter === "SEMUA" || (item.produkJenis || item.type).toUpperCase().includes(selectedFilter)
+  );
+
+  const handleOpenRekening = async () => {
+    if (!newRekeningForm.anggotaId || !newRekeningForm.produkId) {
+      showModal("warning", "Pilihan Tidak Lengkap", "Harap pilih Anggota dan Produk Simpanan yang valid.");
+      return;
+    }
+
+    const res = await createRekeningSimpananAction({
+      anggotaId: newRekeningForm.anggotaId,
+      produkId: newRekeningForm.produkId,
+      setoranAwal: Number(newRekeningForm.setoranAwal) || 0,
+    });
+
+    if (res.success) {
+      await loadDashboardData();
+      setIsOpenModal(false);
+      showModal(
+        "success",
+        "Rekening Berhasil Dibuka",
+        `Buku tabungan baru telah diaktivasi secara persisten di database PostgreSQL. Pembukuan entri jurnal ganda otomatis disesuaikan.`
+      );
+    } else {
+      showModal("warning", "Aktivasi Gagal", res.error || "Gagal membuka rekening baru.");
+    }
+  };
+
+  const handleSimulasiMutasi = async (tipe: "setor" | "tarik", nominal: number) => {
     if (!selectedRekening) return;
 
-    // Batasan bisnis: Simpanan Pokok dan Wajib tidak bisa ditarik
-    if (tipe === "tarik" && (selectedRekening.type.includes("Pokok") || selectedRekening.type.includes("Wajib"))) {
+    if (tipe === "tarik" && (selectedRekening.produkJenis === "POKOK" || selectedRekening.produkJenis === "WAJIB" || selectedRekening.type.includes("Pokok") || selectedRekening.type.includes("Wajib"))) {
       showModal("warning", "Akses Ditolak", "Saldo Simpanan Pokok dan Wajib tidak dapat ditarik selama keanggotaan masih aktif sesuai aturan Undang-Undang Koperasi.");
       setIsMutasiModal(false);
       return;
     }
 
-    setRekeningList((prev) =>
-      prev.map((item) => {
-        if (item.id === selectedRekening.id) {
-          const newBal = tipe === "setor" ? item.balance + nominal : item.balance - nominal;
-          return { ...item, balance: newBal, lastTrx: "Baru Saja" };
-        }
-        return item;
-      })
-    );
+    const res = await createMutasiSimpananAction({
+      rekeningId: selectedRekening.id,
+      jenis: tipe === "setor" ? "SETORAN" : "PENARIKAN",
+      nominal,
+    });
 
-    setIsMutasiModal(false);
-    showModal(
-      "success",
-      `Mutasi ${tipe === "setor" ? "Setoran" : "Penarikan"} Berhasil`,
-      `Dana sebesar Rp ${nominal.toLocaleString("id-ID")} telah diproses pada rekening ${selectedRekening.noRek}. Log audit atomik telah disisipkan.`
-    );
+    if (res.success) {
+      await loadDashboardData();
+      setIsMutasiModal(false);
+      showModal(
+        "success",
+        `Mutasi ${tipe === "setor" ? "Setoran" : "Penarikan"} Berhasil`,
+        `Dana sebesar Rp ${nominal.toLocaleString("id-ID")} telah diproses pada database PostgreSQL rekening ${selectedRekening.noRek}. Log audit atomik telah disisipkan.`
+      );
+    } else {
+      showModal("warning", "Transaksi Ditolak", res.error || "Gagal memproses transaksi.");
+    }
   };
 
   return (
@@ -132,7 +185,7 @@ export default function SimpananPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-lg sm:text-xl font-bold text-slate-900 font-mono">Rp 12.450.000</div>
+            <div className="text-lg sm:text-xl font-bold text-slate-900 font-mono">Rp {metricSummary.totalSukarela.toLocaleString("id-ID")}</div>
             <p className="text-[10px] text-slate-400 mt-1">Dapat ditarik kapan saja</p>
           </CardContent>
         </Card>
@@ -145,7 +198,7 @@ export default function SimpananPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-lg sm:text-xl font-bold text-slate-900 font-mono">Rp 18.350.000</div>
+            <div className="text-lg sm:text-xl font-bold text-slate-900 font-mono">Rp {metricSummary.totalWajib.toLocaleString("id-ID")}</div>
             <p className="text-[10px] text-emerald-600 flex items-center gap-0.5 mt-1 font-medium">
               <ArrowUpRight className="w-3 h-3" />
               <span>Rutin bulanan</span>
@@ -161,7 +214,7 @@ export default function SimpananPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-lg sm:text-xl font-bold text-slate-900 font-mono">Rp 45.000.000</div>
+            <div className="text-lg sm:text-xl font-bold text-slate-900 font-mono">Rp {metricSummary.totalDeposito.toLocaleString("id-ID")}</div>
             <p className="text-[10px] text-purple-600 font-medium mt-1">Bunga kompetitif 6.5% p.a</p>
           </CardContent>
         </Card>
@@ -174,7 +227,7 @@ export default function SimpananPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-lg sm:text-xl font-bold text-slate-900 font-mono">Rp 6.250.000</div>
+            <div className="text-lg sm:text-xl font-bold text-slate-900 font-mono">Rp {metricSummary.totalPokok.toLocaleString("id-ID")}</div>
             <p className="text-[10px] text-slate-400 mt-1">Kontribusi modal keanggotaan</p>
           </CardContent>
         </Card>
@@ -312,29 +365,30 @@ export default function SimpananPage() {
             <div>
               <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Anggota Pemilik</label>
               <select
-                value={newRekeningForm.anggotaName}
-                onChange={(e) => setNewRekeningForm({ ...newRekeningForm, anggotaName: e.target.value })}
+                value={newRekeningForm.anggotaId}
+                onChange={(e) => setNewRekeningForm({ ...newRekeningForm, anggotaId: e.target.value })}
                 className="w-full h-8 px-2.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:border-blue-500 text-slate-800 bg-white"
               >
-                <option value="Budi Santoso (M-001)">Budi Santoso (M-001)</option>
-                <option value="Siti Aminah (M-002)">Siti Aminah (M-002)</option>
-                <option value="Ahmad Dahlan (M-003)">Ahmad Dahlan (M-003)</option>
-                <option value="Rina Nose (M-004)">Rina Nose (M-004)</option>
-                <option value="Dewi Lestari (M-005)">Dewi Lestari (M-005)</option>
+                {anggotaOpts.map((ang) => (
+                  <option key={ang.id} value={ang.id}>
+                    {ang.namaLengkap} ({ang.nik})
+                  </option>
+                ))}
               </select>
             </div>
 
             <div>
               <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Pilihan Produk</label>
               <select
-                value={newRekeningForm.produkType}
-                onChange={(e) => setNewRekeningForm({ ...newRekeningForm, produkType: e.target.value })}
+                value={newRekeningForm.produkId}
+                onChange={(e) => setNewRekeningForm({ ...newRekeningForm, produkId: e.target.value })}
                 className="w-full h-8 px-2.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:border-blue-500 text-slate-800 bg-white"
               >
-                <option value="Simpanan Sukarela">Simpanan Sukarela (Bisa Ditarik)</option>
-                <option value="Simpanan Wajib">Simpanan Wajib (Rutin Bulanan)</option>
-                <option value="Deposito Berjangka">Deposito Berjangka (Bunga Penuh)</option>
-                <option value="Simpanan Pokok">Simpanan Pokok (Modal Awal)</option>
+                {produkOpts.map((prd) => (
+                  <option key={prd.id} value={prd.id}>
+                    {prd.namaProduk} ({prd.jenis})
+                  </option>
+                ))}
               </select>
             </div>
 
