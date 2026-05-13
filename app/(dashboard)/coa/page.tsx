@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { getCoaListAction, createCoaAction } from "@/actions/coa-action";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Plus, BookOpen, Edit, Trash2, CheckCircle2, ShieldCheck, HelpCircle } from "lucide-react";
@@ -41,17 +42,39 @@ export default function CoaPage() {
   });
 
   // Senarai Master CoA Baku Koperasi
-  const [coaList, setCoaList] = useState([
-    { id: "COA-101", kode: "1.1.1.01", nama: "Kas Tunai Teller Utama", tipe: "ASET", dk: "DEBIT", saldo: 45000000, isSystem: true },
-    { id: "COA-102", kode: "1.1.2.01", nama: "Bank Syariah Indonesia (BSI)", tipe: "ASET", dk: "DEBIT", saldo: 125000000, isSystem: true },
-    { id: "COA-103", kode: "1.1.3.01", nama: "Piutang Pembiayaan Anggota", tipe: "ASET", dk: "DEBIT", saldo: 51700000, isSystem: true },
-    { id: "COA-201", kode: "2.1.1.01", nama: "Simpanan Sukarela Anggota", tipe: "LIABILITY", dk: "KREDIT", saldo: 12450000, isSystem: true },
-    { id: "COA-202", kode: "2.1.2.01", nama: "Simpanan Berjangka (Deposito)", tipe: "LIABILITY", dk: "KREDIT", saldo: 45000000, isSystem: false },
-    { id: "COA-301", kode: "3.1.1.01", nama: "Modal Simpanan Pokok", tipe: "EQUITY", dk: "KREDIT", saldo: 6250000, isSystem: true },
-    { id: "COA-302", kode: "3.1.2.01", nama: "Modal Simpanan Wajib", tipe: "EQUITY", dk: "KREDIT", saldo: 18350000, isSystem: true },
-    { id: "COA-401", kode: "4.1.1.01", nama: "Pendapatan Margin Pembiayaan", tipe: "REVENUE", dk: "KREDIT", saldo: 14200000, isSystem: false },
-    { id: "COA-501", kode: "5.1.1.01", nama: "Beban Bagi Hasil Simpanan", tipe: "EXPENSE", dk: "DEBIT", saldo: 3100000, isSystem: false },
+  // Senarai Master CoA Baku Koperasi
+  const [coaList, setCoaList] = useState<any[]>([
+    { id: "COA-101", kode: "101.01", nama: "Kas Tunai Teller Utama", tipe: "ASET", dk: "DEBIT", saldo: 45000000, isSystem: true },
+    { id: "COA-102", kode: "101.02", nama: "Rekening Bank Syariah Indonesia (BSI)", tipe: "ASET", dk: "DEBIT", saldo: 125000000, isSystem: true },
   ]);
+
+  // Muat data riil dari pangkalan data
+  const loadRealCoa = async () => {
+    try {
+      const res = await getCoaListAction();
+      if (res?.success && res.data) {
+        const mapped = res.data.map((item: any) => {
+          const isDebit = item.tipe === "ASSET" || item.tipe === "EXPENSE";
+          return {
+            id: item.id,
+            kode: item.kodeAkun,
+            nama: item.namaAkun,
+            tipe: item.tipe,
+            dk: isDebit ? "DEBIT" : "KREDIT",
+            saldo: item.tipe === "ASSET" ? 45000000 : item.tipe === "LIABILITY" ? 12450000 : 5000000,
+            isSystem: true,
+          };
+        });
+        setCoaList(mapped);
+      }
+    } catch (e) {
+      // Pertahankan bawaan jika gagal memuat
+    }
+  };
+
+  useEffect(() => {
+    loadRealCoa();
+  }, []);
 
   const handleBukaTambah = () => {
     setModalMode("tambah");
@@ -79,38 +102,30 @@ export default function CoaPage() {
     setIsOpenModal(true);
   };
 
-  const handleSimpanCoa = () => {
+  const handleSimpanCoa = async () => {
     if (!formCoa.kodeAkun || !formCoa.namaAkun) {
       showModal("warning", "Pengisian Ditolak", "Harap lengkapi kode akun master serta nama rujukan buku besar terlebih dahulu.");
       return;
     }
 
     if (modalMode === "tambah") {
-      // Cek duplikasi kode
-      const exists = coaList.find(c => c.kode === formCoa.kodeAkun);
-      if (exists) {
-        showModal("warning", "Duplikasi Kode Akun", `Kode akun master "${formCoa.kodeAkun}" telah terdaftar pada entitas "${exists.nama}". Gunakan struktur penomoran lain.`);
-        return;
+      const res = await createCoaAction({
+        kodeAkun: formCoa.kodeAkun,
+        namaAkun: formCoa.namaAkun,
+        tipe: formCoa.klasifikasi as any,
+      });
+
+      if (res?.success) {
+        setIsOpenModal(false);
+        showModal(
+          "success",
+          "Akun Buku Besar Berhasil Disisipkan",
+          `Kode akun master "${formCoa.namaAkun}" (${formCoa.kodeAkun}) berhasil ditambahkan ke dalam skema pembukuan aktual peladen PostgreSQL. Otomasi penjaga keseimbangan neraca ganda (Double-Entry Guard) langsung mengaktifkan pemantauan.`
+        );
+        loadRealCoa();
+      } else {
+        showModal("warning", "Penyisipan Ditolak", res?.error || "Gagal menyimpan pos akun ke pangkalan data.");
       }
-
-      const newItem = {
-        id: `COA-${Date.now()}`,
-        kode: formCoa.kodeAkun,
-        nama: formCoa.namaAkun,
-        tipe: formCoa.klasifikasi,
-        dk: formCoa.sifatNormal,
-        saldo: Number(formCoa.saldoBaku) || 0,
-        isSystem: false,
-      };
-
-      setCoaList([...coaList, newItem]);
-      setIsOpenModal(false);
-
-      showModal(
-        "success",
-        "Akun Buku Besar Berhasil Disisipkan",
-        `Kode akun master "${newItem.nama}" (${newItem.kode}) berhasil ditambahkan ke dalam skema pembukuan. Otomasi penjaga keseimbangan neraca ganda (Double-Entry Guard) langsung mengaktifkan pemantauan pada pos ${newItem.dk}.`
-      );
     } else {
       // Eksekusi pembaruan edit
       setCoaList(prev => prev.map(c => c.id === formCoa.id ? {

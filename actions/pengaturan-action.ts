@@ -9,19 +9,16 @@ import { revalidatePath } from "next/cache";
  */
 export async function getPengaturanSistemAction() {
   try {
-    // Kita gunakan fallback koperasi pertama atau UUID master
-    const koperasi = await prisma.koperasi.findFirst();
+    // Kita gunakan fallback koperasi pertama atau inisialisasi instansi Koperasi utama jika DB masih kosong
+    let koperasi = await prisma.koperasi.findFirst();
     if (!koperasi) {
-      return {
-        success: true,
+      koperasi = await prisma.koperasi.create({
         data: {
-          koperasiName: process.env.NEXT_PUBLIC_KOPERASI_NAME || "KSP Harapan Artha Nusantara",
-          simpananBungaPct: 4.5,
-          pinjamanMarginPct: 12.0,
-          dendaHariPct: 0.1,
-          maxPinjamanCount: 2,
+          nama: process.env.NEXT_PUBLIC_KOPERASI_NAME || "KSP Harapan Artha Nusantara",
+          alamat: "Jl. Jend. Sudirman Kav. 45, Jakarta",
+          telepon: "021-5552910",
         },
-      };
+      });
     }
 
     // Ambil pengaturan sistem riil
@@ -79,9 +76,15 @@ export async function savePengaturanSistemAction(inputData: {
   userId?: string;
 }) {
   try {
-    const koperasi = await prisma.koperasi.findFirst();
+    let koperasi = await prisma.koperasi.findFirst();
     if (!koperasi) {
-      return { success: false, error: "Instansi koperasi master belum terdaftar." };
+      koperasi = await prisma.koperasi.create({
+        data: {
+          nama: inputData.koperasiName || "KSP Harapan Artha Nusantara",
+          alamat: "Jl. Jend. Sudirman Kav. 45, Jakarta",
+          telepon: "021-5552910",
+        },
+      });
     }
 
     // Eksekusi pembaruan dan jejak audit dalam satu transaksi atomik (Aturan L)
