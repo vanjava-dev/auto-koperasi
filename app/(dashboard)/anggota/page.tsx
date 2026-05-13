@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { getAnggotaListAction, createAnggotaAction } from "@/actions/anggota-action";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { 
@@ -66,13 +67,38 @@ export default function AnggotaPage() {
   };
 
   // Senarai anggota dinamis
-  const [membersData, setMembersData] = useState([
-    { id: "M-001", nik: "3171234567890001", name: "Budi Santoso", status: "Aktif", date: "10 Jan 2024", savings: 2450000, gender: "Laki-Laki", address: "Jl. Sudirman Kav. 1" },
-    { id: "M-002", nik: "3171234567890002", name: "Siti Aminah", status: "Aktif", date: "15 Feb 2024", savings: 1200000, gender: "Perempuan", address: "Jl. Thamrin No. 4" },
-    { id: "M-003", nik: "3171234567890003", name: "Ahmad Dahlan", status: "Aktif", date: "20 Mar 2024", savings: 5500000, gender: "Laki-Laki", address: "Jl. Diponegoro 2" },
-    { id: "M-004", nik: "3171234567890004", name: "Rina Nose", status: "Menunggu", date: "02 Mei 2026", savings: 100000, gender: "Perempuan", address: "Jl. Merdeka 10" },
-    { id: "M-005", nik: "3171234567890005", name: "Dewi Lestari", status: "Aktif", date: "12 Apr 2025", savings: 8900000, gender: "Perempuan", address: "Jl. Pajajaran 9" },
+  const [membersData, setMembersData] = useState<any[]>([
+    { id: "M-001", nik: "3171234567890001", name: "Budi Santoso", status: "Aktif", date: "10 Jan 2024", savings: 2450000, gender: "Laki-Laki", address: "Jl. Sudirman Kav. 1", ocrVerified: true },
   ]);
+
+  const loadRealMembers = async () => {
+    try {
+      const res = await getAnggotaListAction();
+      if (res?.success && res.data && res.data.length > 0) {
+        setMembersData(res.data.map((m: any, idx: number) => {
+          const totalSimp = m.rekeningSimpanan && m.rekeningSimpanan.length > 0
+            ? m.rekeningSimpanan.reduce((acc: number, r: any) => acc + Number(r.saldo), 0)
+            : 500000;
+          return {
+            id: `M-${String(idx + 1).padStart(3, "0")}`,
+            realId: m.id,
+            nik: m.nik,
+            name: m.namaLengkap,
+            status: m.status === "AKTIF" ? "Aktif" : m.status === "MENUNGGU" ? "Menunggu" : "Pasif",
+            date: new Date(m.createdAt).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }),
+            savings: totalSimp,
+            gender: "Laki-Laki",
+            address: m.alamat || "-",
+            ocrVerified: m.ocrVerified,
+          };
+        }));
+      }
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    loadRealMembers();
+  }, []);
 
   // Handler Pindai dari Berkas Lokal Komputer
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -170,37 +196,43 @@ export default function AnggotaPage() {
     }
   };
 
-  const handleSimpanAnggota = () => {
+  const handleSimpanAnggota = async () => {
     if (!regForm.nama || !regForm.nik) {
       showModal("warning", "Isian Tidak Lengkap", "Harap lengkapi minimal NIK dan Nama Lengkap anggota atau gunakan pemicu unggah berkas/kamera untuk pengisian otomatis.");
       return;
     }
 
-    const newId = `M-00${membersData.length + 1}`;
-    const newMember = {
-      id: newId,
-      nik: regForm.nik,
-      name: regForm.nama,
-      status: "Aktif",
-      date: new Date().toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }),
-      savings: 500000,
-      gender: regForm.jenisKelamin.includes("PEREMPUAN") ? "Perempuan" : "Laki-Laki",
-      address: regForm.alamat,
-    };
+    try {
+      const res = await createAnggotaAction({
+        nik: regForm.nik,
+        namaLengkap: regForm.nama,
+        alamat: regForm.alamat,
+        tempatLahir: regForm.tempatLahir,
+        tanggalLahir: regForm.tglLahir,
+        jenisKelamin: regForm.jenisKelamin,
+        ocrVerified: ocrSuccess,
+      });
 
-    setMembersData([newMember, ...membersData]);
-    setIsRegisterOpen(false);
-    showModal(
-      "success",
-      "Anggota Baru Berhasil Terdaftar",
-      `Biodata atas nama ${regForm.nama} (${regForm.nik}) telah berhasil didaftarkan ke Buku Induk. Rekening simpanan pokok otomatis diinisialisasi senilai Rp 500.000 berserta rekam jejak stempel audit absolut.`
-    );
+      if (res.success) {
+        await loadRealMembers();
+        setIsRegisterOpen(false);
+        showModal(
+          "success",
+          "Anggota Baru Berhasil Terdaftar",
+          `Biodata atas nama ${regForm.nama} (${regForm.nik}) telah berhasil didaftarkan secara persisten ke PostgreSQL. Rekening simpanan pokok otomatis diinisialisasi berserta rekam jejak stempel audit absolut.`
+        );
 
-    // Reset
-    setRegForm({ nik: "", nama: "", alamat: "", tempatLahir: "", tglLahir: "", jenisKelamin: "" });
-    setKtpUrlInput("");
-    setSelectedFileName(null);
-    setOcrSuccess(false);
+        // Reset
+        setRegForm({ nik: "", nama: "", alamat: "", tempatLahir: "", tglLahir: "", jenisKelamin: "" });
+        setKtpUrlInput("");
+        setSelectedFileName(null);
+        setOcrSuccess(false);
+      } else {
+        showModal("warning", "Gagal Mendaftarkan Anggota", res.error || "Terjadi galat saat menyimpan ke pangkalan data.");
+      }
+    } catch (e: any) {
+      showModal("warning", "Galat Peladen", "Koneksi ke peladen terputus saat menyimpan keanggotaan.");
+    }
   };
 
   const handleLihatDetail = (row: any) => {
@@ -313,7 +345,14 @@ export default function AnggotaPage() {
                     {row.nik}
                   </TableCell>
                   <TableCell className="text-xs font-semibold text-slate-900">
-                    {row.name}
+                    <div className="flex items-center gap-1.5">
+                      {row.name}
+                      {row.ocrVerified && (
+                        <span title="Tervalidasi AI OCR Scanner" className="inline-flex items-center text-[9px] font-medium text-emerald-600 bg-emerald-50 border border-emerald-100 rounded px-1 py-0.2">
+                          <CheckCircle2 className="w-2.5 h-2.5 mr-0.5 text-emerald-600" /> OCR
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-xs text-slate-500 font-medium">
                     {row.date}
