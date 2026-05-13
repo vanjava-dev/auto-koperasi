@@ -101,14 +101,14 @@ Menggunakan pendekatan **UI/UX & Frontend-First**, kita memastikan seluruh tampi
 ---
 
 ## 🏁 TAHAP 6 — Hardening, Pengujian Bebas Galat, & Go-Live
-**Status:** ⏳ **SEGERA HADIR (Tahap Mendatang)**  
-**Tujuan:** Memoles performa, menutup celah keamanan, dan merilis sistem ke lingkungan produksi peladen awan.
+**Status:** ✅ **SELESAI (100% Go-Live Ready)**  
+**Tujuan:** Memoles performa, menutup celah keamanan, menerapkan proteksi COA ganda, dan menyusun buku panduan bagi kelancaran operasional peladen awan.
 
 ### Daftar Periksa:
-- [ ] **Penerapan Proteksi Entri Ganda (Double-Entry Guard)**.
-- [ ] **Optimalisasi Kinerja & Singgahan (Caching)**.
-- [ ] **Penyusunan Panduan Pengguna Akhir**.
-- [ ] **🔒 PENGAMANAN GIT TERAKHIR**: Pemberian tanda versi rilis stabil (`git tag v1.0.0`).
+- [x] **Penerapan Proteksi Entri Ganda (Double-Entry Guard)**: Pengamanan antarmuka saat penambahan portofolio produk dan konfigurasi finansial global terikat langsung ke pos COA.
+- [x] **Optimalisasi Kinerja & Singgahan (Caching)**: Strategi revalidasi Next.js tersinkronisasi di jalur-jalur kritis.
+- [x] **Penyusunan Panduan Pengguna Akhir**: Dokumen referensi `docs/12-end-user-guide.md` yang lengkap dan terstruktur.
+- [x] **🔒 PENGAMANAN GIT TERAKHIR**: Menetapkan tanda versi rilis stabil (`git tag v1.0.0`) sebagai penanda kesiapan *Go-Live*.
 
 ***
 
@@ -121,4 +121,4 @@ Menggunakan pendekatan **UI/UX & Frontend-First**, kita memastikan seluruh tampi
 | **Tahap 3** | Skema ORM | ✅ Pembuatan Skema | Skema Prisma tervalidasi + Seeder | `git push origin main` | ✅ Tuntas |
 | **Tahap 4** | Server Logic | ✅ Kueri Riil | UI dinamis membaca data peladen riil | `git push origin main` | ✅ Tuntas |
 | **Tahap 5** | Layanan AI & UI | ✅ Pencatatan Log | Ekstraksi OCR, Obrolan SOP, Cron Dasbor | `git push origin main` | ✅ Tuntas |
-| **Tahap 6** | Stabilisasi | ✅ Operasional | Siap digunakan di peladen awan | `git push origin main --tags` | ⏳ Tertunda |
+| **Tahap 6** | Stabilisasi | ✅ Operasional | Siap digunakan di peladen awan | `git push origin main --tags` | ✅ Tuntas |

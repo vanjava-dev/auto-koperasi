@@ -92,7 +92,7 @@ export default function DashboardPage() {
   const handleBukaKasir = () => {
     showModal(
       "success",
-      "Sesi Kasir / Teller Diaktifkan",
+      "Sesi Teller Diaktifkan",
       "Sesi laci kasir harian telah berhasil dibuka dengan otorisasi tanda tangan atomik. Terminal pembayaran siap memproses setoran tunai, transfer bank, maupun kode bayar instan QRIS."
     );
   };

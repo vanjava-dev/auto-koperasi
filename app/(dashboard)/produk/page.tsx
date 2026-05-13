@@ -16,6 +16,10 @@ export default function ProdukPage() {
   const [modalMode, setModalMode] = useState<"tambah" | "edit">("tambah");
   const [selectedId, setSelectedId] = useState("");
 
+  // State Double-Entry Guard
+  const [showGuardModal, setShowGuardModal] = useState(false);
+  const [selectedCoa, setSelectedCoa] = useState("201.01 - Simpanan Sukarela Anggota (Kewajiban)");
+
   // State Modal Umpan Balik
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
@@ -85,6 +89,19 @@ export default function ProdukPage() {
       keterangan: isSimpanan ? item.tipe : item.tenorMax,
     });
     setIsOpenModal(true);
+  };
+
+  const handleTriggerSimpan = () => {
+    if (!formProduk.nama || !formProduk.kode) {
+      showModal("warning", "Gagal Menyimpan", "Harap lengkapi nama paket dan kode identifikasi produk terlebih dahulu.");
+      return;
+    }
+    setSelectedCoa(
+      activeTab === "simpanan" 
+        ? "201.01 - Simpanan Sukarela Anggota (Kewajiban)" 
+        : "101.03 - Piutang Pembiayaan Anggota (Aset Lancar)"
+    );
+    setShowGuardModal(true);
   };
 
   const handleSimpanProduk = () => {
@@ -429,8 +446,79 @@ export default function ProdukPage() {
             <Button variant="outline" size="sm" onClick={() => setIsOpenModal(false)} className="text-xs h-8 font-semibold">
               Batal
             </Button>
-            <Button size="sm" onClick={handleSimpanProduk} className="bg-blue-600 hover:bg-blue-700 text-xs text-white h-8 font-bold shadow-md">
+            <Button size="sm" onClick={handleTriggerSimpan} className="bg-blue-600 hover:bg-blue-700 text-xs text-white h-8 font-bold shadow-md">
               {modalMode === "tambah" ? "Simpan Katalog" : "Perbarui Portofolio"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Dialog Proteksi Entri Ganda (Double-Entry Guard) ── */}
+      <Dialog open={showGuardModal} onOpenChange={setShowGuardModal}>
+        <DialogContent className="sm:max-w-[450px] p-6 border-none shadow-2xl">
+          <DialogHeader>
+            <div className="flex items-center gap-2 text-amber-600 mb-1">
+              <Layers className="w-5 h-5 shrink-0" />
+              <DialogTitle className="text-sm font-bold uppercase tracking-wider">Proteksi Entri Ganda (Double-Entry Guard)</DialogTitle>
+            </div>
+            <DialogDescription className="text-xs text-slate-600 leading-relaxed">
+              Setiap produk finansial wajib dikaitkan dengan pos <span className="font-bold text-slate-900">Akun Buku Besar (Chart of Accounts)</span> untuk menjamin otomatisasi jurnal Debit/Kredit yang seimbang saat transaksi berlangsung.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-3 space-y-3">
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1.5">
+              <div className="flex justify-between text-[10px] text-slate-500">
+                <span>Nama Paket:</span>
+                <span className="font-bold text-slate-900">{formProduk.nama || "-"}</span>
+              </div>
+              <div className="flex justify-between text-[10px] text-slate-500">
+                <span>Kode Produk:</span>
+                <span className="font-mono font-bold text-blue-600">{formProduk.kode || "-"}</span>
+              </div>
+              <div className="flex justify-between text-[10px] text-slate-500">
+                <span>Parameter (% p.a):</span>
+                <span className="font-mono font-bold text-slate-900">{formProduk.bungaAtauMargin || "0"}%</span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Keterikatan Pos Buku Besar (COA)</label>
+              <select 
+                value={selectedCoa}
+                onChange={(e) => setSelectedCoa(e.target.value)}
+                className="w-full h-8 px-2 text-xs font-semibold rounded-lg border border-slate-200 text-slate-900 bg-white focus:outline-none focus:border-blue-500"
+              >
+                {activeTab === "simpanan" ? (
+                  <>
+                    <option value="201.01 - Simpanan Sukarela Anggota (Kewajiban)">201.01 - Simpanan Sukarela Anggota (Kewajiban)</option>
+                    <option value="201.02 - Simpanan Berjangka / Deposito (Kewajiban)">201.02 - Simpanan Berjangka / Deposito (Kewajiban)</option>
+                    <option value="301.01 - Simpanan Pokok Anggota (Ekuitas)">301.01 - Simpanan Pokok Anggota (Ekuitas)</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="101.03 - Piutang Pembiayaan Anggota (Aset Lancar)">101.03 - Piutang Pembiayaan Anggota (Aset Lancar)</option>
+                    <option value="101.04 - Piutang Pembiayaan Multiguna (Aset Lancar)">101.04 - Piutang Pembiayaan Multiguna (Aset Lancar)</option>
+                  </>
+                )}
+              </select>
+              <p className="text-[9px] text-slate-400 mt-1">Mengikat pos di atas menjamin kepatuhan ganda otomatis tanpa campur tangan pembukuan manual.</p>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowGuardModal(false)} className="text-xs h-8 font-semibold">
+              Tinjau Ulang
+            </Button>
+            <Button 
+              size="sm" 
+              onClick={() => {
+                setShowGuardModal(false);
+                handleSimpanProduk();
+              }} 
+              className="bg-amber-600 hover:bg-amber-700 text-xs text-white h-8 font-bold shadow-md"
+            >
+              Ya, Terapkan & Kaitkan COA
             </Button>
           </DialogFooter>
         </DialogContent>

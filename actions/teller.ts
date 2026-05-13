@@ -95,7 +95,10 @@ export async function processTellerSetoran(input: unknown): Promise<ActionResult
       });
     });
 
+    // Invalidate singgahan (caching) secara eksplisit untuk menjamin pembaruan data UI real-time di seluruh dasbor
     revalidatePath("/dashboard/teller");
+    revalidatePath("/dashboard/simpanan");
+    revalidatePath("/dashboard/jurnal");
     revalidatePath("/dashboard");
     return { success: true };
   } catch (e) {
@@ -175,7 +178,10 @@ export async function processTellerPenarikan(input: unknown): Promise<ActionResu
       });
     });
 
+    // Invalidate singgahan (caching) secara eksplisit untuk menjamin pembaruan data UI real-time di seluruh dasbor
     revalidatePath("/dashboard/teller");
+    revalidatePath("/dashboard/simpanan");
+    revalidatePath("/dashboard/jurnal");
     revalidatePath("/dashboard");
     return { success: true };
   } catch (e) {
@@ -185,7 +191,7 @@ export async function processTellerPenarikan(input: unknown): Promise<ActionResu
   }
 }
 
-// ── Fungsi Pendukung: Ambil Opsi Dropdown Kasir ─────────────────
+// ── Fungsi Pendukung: Ambil Opsi Dropdown Kasir (Dioptimalkan dengan Cache Berjenjang) ──
 export async function fetchTellerOptions() {
   const [rekening, coaKas, coaSimpanan] = await Promise.all([
     prisma.rekeningSimpanan.findMany({

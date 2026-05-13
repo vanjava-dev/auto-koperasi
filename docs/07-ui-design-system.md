@@ -167,7 +167,7 @@ MACET       → bg-red-200     text-red-900 font-bold
 [Tabel: Angsuran Jatuh Tempo Minggu Ini]  [Tabel: Pinjaman Baru Menunggu Persetujuan]
 ```
 
-### 6.2 Kasir / Teller Interface (/kasir)
+### 6.2 Teller Interface (/kasir)
 ```
 [Input: Cari Anggota (No. Anggota / Nama / NIK)]
 

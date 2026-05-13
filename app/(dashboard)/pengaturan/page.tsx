@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Save, ShieldCheck, RefreshCw, Sliders, AlertCircle, Database, Plus } from "lucide-react";
+import { Save, ShieldCheck, RefreshCw, Sliders, AlertCircle, Database, Plus, Layers } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { FeedbackModal, FeedbackType } from "@/components/shared/FeedbackModal";
 import { fetchAuditLogsAction } from "@/actions/audit-log-bridge";
 import { getPengaturanSistemAction, savePengaturanSistemAction } from "@/actions/pengaturan-action";
@@ -13,6 +14,9 @@ export default function PengaturanPage() {
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
+
+  // State Double-Entry Guard Modal
+  const [showGuardModal, setShowGuardModal] = useState(false);
 
   // State Feedback Modal
   const [modalState, setModalState] = useState<{
@@ -162,7 +166,7 @@ export default function PengaturanPage() {
             disabled={isSaving}
             size="sm"
             className="bg-blue-600 hover:bg-blue-700 text-xs text-white h-9 shadow-md"
-            onClick={handleSaveConfig}
+            onClick={() => setShowGuardModal(true)}
           >
             <Save className={`mr-2 h-4 w-4 ${isSaving ? "animate-spin" : ""}`} />
             {isSaving ? "Menyimpan..." : "Simpan Konfigurasi"}
@@ -353,6 +357,44 @@ export default function PengaturanPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* ── Dialog Peringatan Proteksi Entri Ganda (Double-Entry Guard) ── */}
+      <Dialog open={showGuardModal} onOpenChange={setShowGuardModal}>
+        <DialogContent className="sm:max-w-[450px] p-6 border-none shadow-2xl">
+          <DialogHeader>
+            <div className="flex items-center gap-2 text-amber-600 mb-1">
+              <Layers className="w-5 h-5 shrink-0" />
+              <DialogTitle className="text-sm font-bold uppercase tracking-wider">Proteksi Pembukuan Ganda</DialogTitle>
+            </div>
+            <DialogDescription className="text-xs text-slate-600 leading-relaxed">
+              Mengubah parameter <span className="font-bold text-slate-900">Suku Bunga Simpanan</span> dan <span className="font-bold text-slate-900">Margin Pembiayaan</span> akan memengaruhi basis penghitungan otomatis neraca keuangan secara menyeluruh.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-3 space-y-2">
+            <div className="p-3 bg-amber-50 rounded-xl border border-amber-100 text-[11px] text-amber-900 leading-relaxed">
+              <span className="font-bold">Kepatuhan Audit:</span> Sesuai SOP Standardisasi UI/UX (Aturan L & F), perubahan konfigurasi finansial ini akan disahkan dan dibukukan langsung ke tabel <code className="font-mono font-bold">AuditLog</code> terpusat tanpa penundaan.
+            </div>
+            <p className="text-[10px] text-slate-400">Pastikan parameter persentase yang dimasukkan telah melalui kesepakatan Rapat Anggota atau Keputusan Pengurus.</p>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowGuardModal(false)} className="text-xs h-8 font-semibold">
+              Batal
+            </Button>
+            <Button 
+              size="sm" 
+              onClick={() => {
+                setShowGuardModal(false);
+                handleSaveConfig();
+              }} 
+              className="bg-blue-600 hover:bg-blue-700 text-xs text-white h-8 font-bold shadow-md"
+            >
+              Setuju & Terapkan Konfigurasi
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Pemanggilan Global FeedbackModal ── */}
       <FeedbackModal
