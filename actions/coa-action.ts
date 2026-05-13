@@ -6,15 +6,25 @@ import { TipeAkunCoa } from ".prisma/client";
 
 // Senarai pos akun standar untuk pengisian awal otomatis (seeding)
 const DEFAULT_COA_SEED = [
+  // ── 1. ASET (ASSET) ──
   { kodeAkun: "101.01", namaAkun: "Kas Tunai Teller Utama", tipe: TipeAkunCoa.ASSET },
   { kodeAkun: "101.02", namaAkun: "Rekening Bank Syariah Indonesia (BSI)", tipe: TipeAkunCoa.ASSET },
   { kodeAkun: "101.03", namaAkun: "Piutang Pembiayaan Anggota", tipe: TipeAkunCoa.ASSET },
+  { kodeAkun: "101.04", namaAkun: "Piutang Pembiayaan Multiguna", tipe: TipeAkunCoa.ASSET },
+  // ── 2. KEWAJIBAN (LIABILITY) ──
   { kodeAkun: "201.01", namaAkun: "Simpanan Sukarela Anggota", tipe: TipeAkunCoa.LIABILITY },
   { kodeAkun: "201.02", namaAkun: "Simpanan Berjangka (Deposito)", tipe: TipeAkunCoa.LIABILITY },
+  // ── 3. EKUITAS (EQUITY) ──
   { kodeAkun: "301.01", namaAkun: "Modal Simpanan Pokok", tipe: TipeAkunCoa.EQUITY },
   { kodeAkun: "301.02", namaAkun: "Modal Simpanan Wajib", tipe: TipeAkunCoa.EQUITY },
+  // ── 4. PENDAPATAN (REVENUE) ──
   { kodeAkun: "401.01", namaAkun: "Pendapatan Margin Pembiayaan", tipe: TipeAkunCoa.REVENUE },
+  { kodeAkun: "401.02", namaAkun: "Pendapatan Administrasi & Provisi", tipe: TipeAkunCoa.REVENUE },
+  { kodeAkun: "401.03", namaAkun: "Pendapatan Denda Keterlambatan", tipe: TipeAkunCoa.REVENUE },
+  // ── 5. BEBAN (EXPENSE) ──
   { kodeAkun: "501.01", namaAkun: "Beban Bagi Hasil Simpanan", tipe: TipeAkunCoa.EXPENSE },
+  { kodeAkun: "501.02", namaAkun: "Beban Operasional Gaji Pengurus", tipe: TipeAkunCoa.EXPENSE },
+  { kodeAkun: "501.03", namaAkun: "Beban Umum & Administrasi Kantor", tipe: TipeAkunCoa.EXPENSE },
 ];
 
 /**
