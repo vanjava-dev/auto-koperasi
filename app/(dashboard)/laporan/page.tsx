@@ -187,6 +187,23 @@ export default function LaporanPage() {
       {/* ── Tampilan Tab 1: Neraca Keuangan Berimbang ── */}
       {activeTab === "neraca" && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in duration-200">
+          {/* Banner Neraca Konsolidasi Pusat */}
+          <div className="col-span-1 md:col-span-2 p-4 bg-gradient-to-r from-slate-900 via-slate-800 to-blue-950 rounded-xl text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md border border-slate-800">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 bg-blue-600 text-white text-[9px] font-bold rounded uppercase tracking-wider">Mode Konsolidasi Otomatis</span>
+                <span className="text-xs font-bold text-blue-200">Kantor Pusat Operasional</span>
+              </div>
+              <p className="text-xs text-slate-300 leading-relaxed max-w-3xl">
+                Sistem mendeteksi simpul <span className="text-white font-bold">Pusat Operasional</span> sedang aktif. Neraca di bawah menyajikan agregasi konsolidasi real-time yang menyatukan pembukuan pos aset dan kewajiban dari seluruh kantor cabang pembantu.
+              </p>
+            </div>
+            <div className="shrink-0 flex items-center gap-2 bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-700">
+              <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-[10px] font-mono text-emerald-300 font-bold">Sinkronisasi Jurnal Aktif</span>
+            </div>
+          </div>
+
           {/* Kolom Aset (Debit) */}
           <Card className="border-none shadow-sm bg-white">
             <CardHeader className="bg-slate-50/70 p-4 border-b border-slate-100">
