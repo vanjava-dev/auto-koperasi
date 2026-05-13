@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { getProdukListAction, createProdukSimpananAction, createProdukPinjamanAction } from "@/actions/produk-action";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Package, Percent, Edit, Trash2, Eye, Layers } from "lucide-react";
@@ -47,20 +48,58 @@ export default function ProdukPage() {
   });
 
   // Senarai Produk Simpanan
-  const [simpananProducts, setSimpananProducts] = useState([
-    { id: "PRD-S01", kode: "SMP-SUKA", nama: "Simpanan Sukarela Fleksibel", tipe: "Sukarela", bunga: 4.5, minAwal: 50000, status: "AKTIF" },
-    { id: "PRD-S02", kode: "SMP-DEP3", nama: "Deposito Berjangka 3 Bulan", tipe: "Berjangka", bunga: 6.0, minAwal: 5000000, status: "AKTIF" },
-    { id: "PRD-S03", kode: "SMP-DEP6", nama: "Deposito Berjangka 6 Bulan", tipe: "Berjangka", bunga: 6.5, minAwal: 5000000, status: "AKTIF" },
-    { id: "PRD-S04", kode: "SMP-DEP12", nama: "Deposito Berjangka 12 Bulan", tipe: "Berjangka", bunga: 7.2, minAwal: 10000000, status: "AKTIF" },
+  const [simpananProducts, setSimpananProducts] = useState<any[]>([
+    { id: "PRD-S01", kode: "SUKARELA", nama: "Simpanan Sukarela Fleksibel", tipe: "Sukarela", bunga: 4.5, minAwal: 50000, status: "AKTIF", coaName: "201.01 - Simpanan Sukarela" },
   ]);
 
   // Senarai Produk Pembiayaan
-  const [pembiayaanProducts, setPembiayaanProducts] = useState([
-    { id: "PRD-P01", kode: "PEM-MIKRO", nama: "Pembiayaan Mikro Mandiri", margin: 12.0, maxPlafon: 25000000, tenorMax: "24 Bulan", status: "AKTIF" },
-    { id: "PRD-P02", kode: "PEM-KEND", nama: "Kredit Kendaraan Bermotor", margin: 14.5, maxPlafon: 50000000, tenorMax: "36 Bulan", status: "AKTIF" },
-    { id: "PRD-P03", kode: "PEM-MULTI", nama: "Pembiayaan Multiguna Usaha", margin: 13.0, maxPlafon: 100000000, tenorMax: "48 Bulan", status: "AKTIF" },
-    { id: "PRD-P04", kode: "PEM-TANI", nama: "Kredit Tani & Pangan", margin: 10.5, maxPlafon: 15000000, tenorMax: "12 Bulan", status: "PASIF" },
+  const [pembiayaanProducts, setPembiayaanProducts] = useState<any[]>([
+    { id: "PRD-P01", kode: "PEM-MIKRO", nama: "Pembiayaan Mikro Mandiri", margin: 12.0, maxPlafon: 25000000, tenorMax: "24 Bulan", status: "AKTIF", coaName: "101.03 - Piutang Pembiayaan" },
   ]);
+
+  const [realCoasList, setRealCoasList] = useState<any[]>([]);
+
+  const loadRealProducts = async () => {
+    try {
+      const res = await getProdukListAction();
+      if (res?.success && res.data) {
+        if (res.data.coas) {
+          setRealCoasList(res.data.coas);
+          if (res.data.coas.length > 0) {
+            setSelectedCoa(res.data.coas[0].id);
+          }
+        }
+        if (res.data.simpanan && res.data.simpanan.length > 0) {
+          setSimpananProducts(res.data.simpanan.map((s: any) => ({
+            id: s.id,
+            kode: s.jenis,
+            nama: s.namaProduk,
+            tipe: s.jenis,
+            bunga: Number(s.nisbahBagiHasil) || 0,
+            minAwal: Number(s.setoranAwalMin) || 0,
+            status: s.isActive ? "AKTIF" : "PASIF",
+            coaName: s.coa ? `${s.coa.kodeAkun} - ${s.coa.namaAkun}` : "-",
+          })));
+        }
+        if (res.data.pinjaman && res.data.pinjaman.length > 0) {
+          setPembiayaanProducts(res.data.pinjaman.map((p: any) => ({
+            id: p.id,
+            kode: "PEM-" + p.tenorMaxBulan,
+            nama: p.namaProduk,
+            margin: Number(p.marginBunga) || 0,
+            maxPlafon: Number(p.plafonMax) || 0,
+            tenorMax: `${p.tenorMaxBulan} Bulan`,
+            status: p.isActive ? "AKTIF" : "PASIF",
+            coaName: p.coaPiutang ? `${p.coaPiutang.kodeAkun} - ${p.coaPiutang.namaAkun}` : "-",
+          })));
+        }
+      }
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    loadRealProducts();
+  }, []);
 
   const handleBukaTambah = (jenis: "simpanan" | "pembiayaan") => {
     setActiveTab(jenis);
@@ -96,15 +135,20 @@ export default function ProdukPage() {
       showModal("warning", "Gagal Menyimpan", "Harap lengkapi nama paket dan kode identifikasi produk terlebih dahulu.");
       return;
     }
-    setSelectedCoa(
-      activeTab === "simpanan" 
-        ? "201.01 - Simpanan Sukarela Anggota (Kewajiban)" 
-        : "101.03 - Piutang Pembiayaan Anggota (Aset Lancar)"
-    );
+    if (realCoasList.length > 0) {
+      const defaultMatch = realCoasList.find(c => 
+        activeTab === "simpanan" ? c.tipe === "LIABILITY" : c.tipe === "ASSET"
+      );
+      if (defaultMatch) {
+        setSelectedCoa(defaultMatch.id);
+      } else {
+        setSelectedCoa(realCoasList[0].id);
+      }
+    }
     setShowGuardModal(true);
   };
 
-  const handleSimpanProduk = () => {
+  const handleSimpanProduk = async () => {
     if (!formProduk.nama || !formProduk.kode) {
       showModal("warning", "Gagal Menyimpan", "Harap lengkapi nama paket dan kode identifikasi produk terlebih dahulu.");
       return;
@@ -112,35 +156,50 @@ export default function ProdukPage() {
 
     if (modalMode === "tambah") {
       if (activeTab === "simpanan") {
-        const newProd = {
-          id: `PRD-S0${simpananProducts.length + 1}`,
-          kode: formProduk.kode.toUpperCase(),
-          nama: formProduk.nama,
-          tipe: formProduk.keterangan || "Kustom",
-          bunga: Number(formProduk.bungaAtauMargin) || 0,
-          minAwal: Number(formProduk.minimalAwal) || 0,
-          status: "AKTIF",
-        };
-        setSimpananProducts([newProd, ...simpananProducts]);
-      } else {
-        const newProd = {
-          id: `PRD-P0${pembiayaanProducts.length + 1}`,
-          kode: formProduk.kode.toUpperCase(),
-          nama: formProduk.nama,
-          margin: Number(formProduk.bungaAtauMargin) || 0,
-          maxPlafon: Number(formProduk.minimalAwal) || 0,
-          tenorMax: formProduk.keterangan || "36 Bulan",
-          status: "AKTIF",
-        };
-        setPembiayaanProducts([newProd, ...pembiayaanProducts]);
-      }
+        let jenisEnum = "SUKARELA";
+        const ket = formProduk.keterangan?.toUpperCase() || "";
+        if (ket.includes("POKOK")) jenisEnum = "POKOK";
+        else if (ket.includes("WAJIB")) jenisEnum = "WAJIB";
+        else if (ket.includes("BERJANGKA") || ket.includes("DEPOSIT")) jenisEnum = "BERJANGKA";
 
-      setIsOpenModal(false);
-      showModal(
-        "success",
-        "Katalog Produk Berhasil Ditambahkan",
-        `Produk ${activeTab === "simpanan" ? "simpanan" : "pembiayaan"} baru "${formProduk.nama}" (${formProduk.kode.toUpperCase()}) telah diintegrasikan ke dalam rujukan master produk dengan skema penandatanganan stempel digital.`
-      );
+        const res = await createProdukSimpananAction({
+          namaProduk: formProduk.nama,
+          jenis: jenisEnum as any,
+          nisbahBagiHasil: Number(formProduk.bungaAtauMargin) || 0,
+          setoranAwalMin: Number(formProduk.minimalAwal) || 0,
+          coaId: selectedCoa,
+        });
+        if (res?.success) {
+          setIsOpenModal(false);
+          showModal(
+            "success",
+            "Katalog Produk Berhasil Ditambahkan",
+            `Produk simpanan baru "${formProduk.nama}" terikat mutlak pada Akun Buku Besar telah diamankan ke PostgreSQL riil.`
+          );
+          loadRealProducts();
+        } else {
+          showModal("warning", "Gagal Menyisipkan", res?.error || "Terjadi kendala penyimpanan ke pangkalan data.");
+        }
+      } else {
+        const res = await createProdukPinjamanAction({
+          namaProduk: formProduk.nama,
+          marginBunga: Number(formProduk.bungaAtauMargin) || 0,
+          plafonMax: Number(formProduk.minimalAwal) || 0,
+          tenorMaxBulan: Number(formProduk.keterangan?.replace(/\D/g, "")) || 24,
+          coaPiutangId: selectedCoa,
+        });
+        if (res?.success) {
+          setIsOpenModal(false);
+          showModal(
+            "success",
+            "Katalog Produk Berhasil Ditambahkan",
+            `Paket pembiayaan baru "${formProduk.nama}" terikat mutlak pada Pos Aset Piutang CoA telah diamankan ke PostgreSQL riil.`
+          );
+          loadRealProducts();
+        } else {
+          showModal("warning", "Gagal Menyisipkan", res?.error || "Terjadi kendala penyimpanan ke pangkalan data.");
+        }
+      }
     } else {
       // Alur Eksekusi Penyuntingan (Edit Mode)
       if (activeTab === "simpanan") {
@@ -248,6 +307,7 @@ export default function ProdukPage() {
                   <TableHead className="th-standard text-center">Klasifikasi</TableHead>
                   <TableHead className="th-standard text-center">Bunga / p.a</TableHead>
                   <TableHead className="th-standard text-right">Setoran Awal Min</TableHead>
+                  <TableHead className="th-standard">Pos Buku Besar</TableHead>
                   <TableHead className="th-standard text-center">Status</TableHead>
                   <TableHead className="th-standard text-right pr-6">Aksi</TableHead>
                 </TableRow>
@@ -269,6 +329,9 @@ export default function ProdukPage() {
                     </TableCell>
                     <TableCell className="text-right font-mono text-xs font-bold text-slate-900">
                       Rp {row.minAwal.toLocaleString("id-ID")}
+                    </TableCell>
+                    <TableCell className="text-xs font-mono font-medium text-slate-500 max-w-[150px] truncate" title={row.coaName}>
+                      {row.coaName}
                     </TableCell>
                     <TableCell className="text-center">
                       <Badge variant="outline" className="text-[9px] font-medium py-0.5 px-2 bg-emerald-50 text-emerald-600 border-emerald-100">
@@ -318,6 +381,7 @@ export default function ProdukPage() {
                   <TableHead className="th-standard text-center">Margin / p.a</TableHead>
                   <TableHead className="th-standard text-right">Batas Maks Plafon</TableHead>
                   <TableHead className="th-standard text-center">Tenor Max</TableHead>
+                  <TableHead className="th-standard">Pos Piutang CoA</TableHead>
                   <TableHead className="th-standard text-center">Status</TableHead>
                   <TableHead className="th-standard text-right pr-6">Aksi</TableHead>
                 </TableRow>
@@ -339,6 +403,9 @@ export default function ProdukPage() {
                     </TableCell>
                     <TableCell className="text-center text-xs text-slate-600 font-medium">
                       {row.tenorMax}
+                    </TableCell>
+                    <TableCell className="text-xs font-mono font-medium text-slate-500 max-w-[150px] truncate" title={row.coaName}>
+                      {row.coaName}
                     </TableCell>
                     <TableCell className="text-center">
                       <Badge variant="outline" className={`text-[9px] font-medium py-0.5 px-2 ${row.status === "AKTIF" ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-slate-50 text-slate-500 border-slate-200"}`}>
@@ -489,17 +556,16 @@ export default function ProdukPage() {
                 onChange={(e) => setSelectedCoa(e.target.value)}
                 className="w-full h-8 px-2 text-xs font-semibold rounded-lg border border-slate-200 text-slate-900 bg-white focus:outline-none focus:border-blue-500"
               >
-                {activeTab === "simpanan" ? (
-                  <>
-                    <option value="201.01 - Simpanan Sukarela Anggota (Kewajiban)">201.01 - Simpanan Sukarela Anggota (Kewajiban)</option>
-                    <option value="201.02 - Simpanan Berjangka / Deposito (Kewajiban)">201.02 - Simpanan Berjangka / Deposito (Kewajiban)</option>
-                    <option value="301.01 - Simpanan Pokok Anggota (Ekuitas)">301.01 - Simpanan Pokok Anggota (Ekuitas)</option>
-                  </>
+                {realCoasList.length > 0 ? (
+                  realCoasList
+                    .filter(c => activeTab === "simpanan" ? c.tipe !== "ASSET" : c.tipe === "ASSET")
+                    .map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.kodeAkun} - {c.namaAkun} ({c.tipe})
+                      </option>
+                    ))
                 ) : (
-                  <>
-                    <option value="101.03 - Piutang Pembiayaan Anggota (Aset Lancar)">101.03 - Piutang Pembiayaan Anggota (Aset Lancar)</option>
-                    <option value="101.04 - Piutang Pembiayaan Multiguna (Aset Lancar)">101.04 - Piutang Pembiayaan Multiguna (Aset Lancar)</option>
-                  </>
+                  <option value="">Memuat pos akun peladen...</option>
                 )}
               </select>
               <p className="text-[9px] text-slate-400 mt-1">Mengikat pos di atas menjamin kepatuhan ganda otomatis tanpa campur tangan pembukuan manual.</p>
