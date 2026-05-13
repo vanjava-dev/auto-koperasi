@@ -48,16 +48,14 @@ export default function SimpananPage() {
 
   // Ringkasan metrik
   const [metricSummary, setMetricSummary] = useState({
-    totalSukarela: 12450000,
-    totalWajib: 18350000,
-    totalDeposito: 45000000,
-    totalPokok: 6250000,
+    totalSukarela: 0,
+    totalWajib: 0,
+    totalDeposito: 0,
+    totalPokok: 0,
   });
 
-  // Data tiruan portofolio rekening simpanan
-  const [rekeningList, setRekeningList] = useState<any[]>([
-    { id: "REC-001", noRek: "014-2024-0001", name: "Budi Santoso", type: "Simpanan Pokok", balance: 500000, status: "AKTIF", lastTrx: "10 Jan 2024" },
-  ]);
+  // Data portofolio rekening simpanan riil
+  const [rekeningList, setRekeningList] = useState<any[]>([]);
 
   const loadDashboardData = async () => {
     try {
@@ -65,10 +63,10 @@ export default function SimpananPage() {
       if (res?.success && res.data) {
         if (res.data.summary) {
           setMetricSummary({
-            totalSukarela: res.data.summary.totalSukarela || 12450000,
-            totalWajib: res.data.summary.totalWajib || 18350000,
-            totalDeposito: res.data.summary.totalDeposito || 45000000,
-            totalPokok: res.data.summary.totalPokok || 6250000,
+            totalSukarela: res.data.summary.totalSukarela || 0,
+            totalWajib: res.data.summary.totalWajib || 0,
+            totalDeposito: res.data.summary.totalDeposito || 0,
+            totalPokok: res.data.summary.totalPokok || 0,
           });
         }
         if (res.data.options) {

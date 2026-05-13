@@ -122,12 +122,6 @@ export async function getSimpananDashboardDataAction() {
       else totalSukarela += bal; // fallback
     }
 
-    // Jika total masih 0 untuk simulasi visual UI agar terlihat kaya
-    if (totalSukarela === 0) totalSukarela = 12450000;
-    if (totalWajib === 0) totalWajib = 18350000;
-    if (totalDeposito === 0) totalDeposito = 45000000;
-    if (totalPokok === 0) totalPokok = 6250000;
-
     // Ambil senarai opsi anggota dan produk untuk dropdown dialog aktivasi
     const anggotaOptions = await prisma.anggota.findMany({
       where: { koperasiId: koperasi.id },
