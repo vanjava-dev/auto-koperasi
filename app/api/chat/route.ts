@@ -111,10 +111,37 @@ export async function POST(req: Request) {
 
       // 1. Logika Perintah Transaksi Setoran
       if (lastMsg.includes("setor") || lastMsg.includes("deposit") || lastMsg.includes("tambah saldo")) {
-        const rek = await prisma.rekeningSimpanan.findFirst({
-          where: { status: "AKTIF" },
-          include: { anggota: true, produk: true },
-        });
+        const words = lastMsg.split(" ");
+        const cleanWords = words.filter((w: string) => 
+          !["setor", "deposit", "tambah", "saldo", "ke", "rekening", "sebesar", "rp", "tunai"].includes(w) && isNaN(Number(w))
+        );
+        const searchTerm = cleanWords.join(" ").trim();
+
+        let rek = null;
+        if (searchTerm.length > 2) {
+          rek = await prisma.rekeningSimpanan.findFirst({
+            where: {
+              status: "AKTIF",
+              anggota: { namaLengkap: { contains: searchTerm, mode: "insensitive" } },
+              produk: { jenis: "SUKARELA" },
+            },
+            include: { anggota: true, produk: true },
+          });
+        }
+
+        if (!rek) {
+          rek = await prisma.rekeningSimpanan.findFirst({
+            where: { status: "AKTIF", produk: { jenis: "SUKARELA" } },
+            include: { anggota: true, produk: true },
+          });
+        }
+
+        if (!rek) {
+          rek = await prisma.rekeningSimpanan.findFirst({
+            where: { status: "AKTIF" },
+            include: { anggota: true, produk: true },
+          });
+        }
 
         if (rek) {
           const match = lastMsg.match(/\d+/g);
@@ -127,29 +154,40 @@ export async function POST(req: Request) {
             || await prisma.chartOfAccount.findFirst({ where: { tipe: "LIABILITY" } });
 
           if (koperasi && coaKas && coaSimpanan) {
-            await processTellerSetoran({
+            const res = await processTellerSetoran({
               rekeningId: rek.id,
               nominal,
               metode: "TUNAI",
-              keterangan: "Setoran tunai otomatis dieksekusi via Perintah Chatbot AI",
+              keterangan: `Setoran tunai otomatis via Perintah Chatbot AI (${searchTerm || 'Umum'})`,
               coaKasId: coaKas.id,
               coaSimpananId: coaSimpanan.id,
               koperasiId: koperasi.id,
             });
 
-            simulatedAnswer = `⚡ **Instruksi Transaksi Diterima & Dieksekusi** ⚡
+            if (res.success) {
+              simulatedAnswer = `⚡ **Instruksi Transaksi Diterima & Dieksekusi** ⚡
 
 Saya telah menjalankan tugas Kasir/Teller untuk mencatat setoran tunai riil pada sistem:
 • **Anggota**: ${rek.anggota?.namaLengkap}
 • **Rekening ID**: \`${rek.id}\`
 • **Produk**: ${rek.produk?.namaProduk}
 • **Nominal Setoran**: **Rp ${nominal.toLocaleString("id-ID")}**
-• **Status Pembukuan**: ✅ Berhasil dibukukan
+• **Status Pembukuan**: ✅ Berhasil dibukukan ke PostgreSQL
 
 Jurnal akuntansi **Dr. Kas Tunai Teller (101.01)** dan **Cr. Simpanan Anggota** telah terbentuk secara mutlak pada Buku Besar dan singgahan antarmuka telah dimutakhirkan.`;
+            } else {
+              simulatedAnswer = `❌ **Transaksi Ditolak oleh Mesin Validasi** ❌
+
+Upaya pencatatan setoran ke rekening \`${rek.id}\` (${rek.produk?.namaProduk}) milik **${rek.anggota?.namaLengkap}** tidak dapat dilanjutkan.
+• **Alasan Validasi**: ${res.error}
+
+*Solusi*: Perintah setoran berulang sebaiknya ditujukan pada akun **Simpanan Sukarela** (karena Simpanan Pokok hanya diizinkan satu kali penyetoran di awal keanggotaan).`;
+            }
+          } else {
+            simulatedAnswer = "Konfigurasi standar Buku Besar (CoA Kas/Simpanan) atau entitas Koperasi belum lengkap di pangkalan data.";
           }
         } else {
-          simulatedAnswer = "Mohon maaf, belum ada rekening simpanan berstatus AKTIF yang dapat dijadikan target setoran otomatis saat ini.";
+          simulatedAnswer = "Mohon maaf, belum ada rekening simpanan berstatus AKTIF (terutama Simpanan Sukarela) yang dapat dijadikan target setoran otomatis saat ini.";
         }
       }
       // 2. Logika Perintah Pencarian Anggota
