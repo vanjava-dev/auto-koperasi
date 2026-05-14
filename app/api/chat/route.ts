@@ -83,11 +83,19 @@ export async function POST(req: Request) {
             return { success: false, error: "Akun Kas atau Kewajiban standar belum dikonfigurasi." };
           }
 
+          const rekObj = await prisma.rekeningSimpanan.findUnique({
+            where: { id: rekeningId },
+            include: { anggota: true, produk: true },
+          });
+          const jenisStr = rekObj?.produk?.jenis === "WAJIB" ? "Wajib" : rekObj?.produk?.jenis === "POKOK" ? "Pokok" : "Sukarela";
+          const namaStr = rekObj?.anggota?.namaLengkap || "Anggota";
+          const tidyKeterangan = `Setoran Simpanan ${jenisStr} a.n. ${namaStr}`;
+
           const res = await processTellerSetoran({
             rekeningId,
             nominal,
             metode: "TUNAI",
-            keterangan: keterangan || "Setoran tunai via Koperasi-AI Chatbot",
+            keterangan: tidyKeterangan,
             coaKasId: coaKas.id,
             coaSimpananId: coaSimpanan.id,
             koperasiId: koperasi.id,
@@ -140,11 +148,17 @@ export async function POST(req: Request) {
             });
           }
 
+          let tidyKeterangan = `Mutasi Kas Operasional - ${targetKat.nama}`;
+          if (kategoriKode === "KELUAR-LISTRIK") tidyKeterangan = "Pembayaran Beban Tagihan Listrik, Air & Internet Kantor";
+          else if (kategoriKode === "KELUAR-ATK") tidyKeterangan = "Pembelian Perlengkapan & ATK Operasional Kantor";
+          else if (kategoriKode === "KELUAR-GAJI") tidyKeterangan = "Pembayaran Beban Gaji & Honorarium Karyawan";
+          else if (kategoriKode === "MASUK-JASA") tidyKeterangan = "Penerimaan Pendapatan Jasa / Fee Layanan Koperasi";
+
           const res = await processTellerOperasional({
             jenis,
             nominal,
             kategori: targetKat.id,
-            keterangan,
+            keterangan: tidyKeterangan,
             coaKasId: coaKas.id,
             koperasiId: koperasi.id,
           });
@@ -259,11 +273,14 @@ export async function POST(req: Request) {
             || await prisma.chartOfAccount.findFirst({ where: { tipe: "LIABILITY" } });
 
           if (koperasi && coaKas && coaSimpanan) {
+            const jenisStr = actualJenis === "WAJIB" ? "Wajib" : actualJenis === "POKOK" ? "Pokok" : "Sukarela";
+            const namaStr = rek.anggota?.namaLengkap || "Anggota";
+
             const res = await processTellerSetoran({
               rekeningId: rek.id,
               nominal,
               metode: "TUNAI",
-              keterangan: `Setoran tunai otomatis via Perintah Chatbot AI (${actualJenis})`,
+              keterangan: `Setoran Simpanan ${jenisStr} a.n. ${namaStr}`,
               coaKasId: coaKas.id,
               coaSimpananId: coaSimpanan.id,
               koperasiId: koperasi.id,
@@ -356,11 +373,17 @@ Ketik perintah seperti **"setor 200000"** untuk menginstruksikan pengisian otoma
             });
           }
 
+          let tidyKeterangan = `Mutasi Kas Operasional - ${targetKat.nama}`;
+          if (kategoriKode === "KELUAR-LISTRIK") tidyKeterangan = "Pembayaran Beban Tagihan Listrik, Air & Internet Kantor";
+          else if (kategoriKode === "KELUAR-ATK") tidyKeterangan = "Pembelian Perlengkapan & ATK Operasional Kantor";
+          else if (kategoriKode === "KELUAR-GAJI") tidyKeterangan = "Pembayaran Beban Gaji & Honorarium Karyawan";
+          else if (kategoriKode === "MASUK-JASA") tidyKeterangan = "Penerimaan Pendapatan Jasa / Fee Layanan Koperasi";
+
           const res = await processTellerOperasional({
             jenis,
             nominal,
             kategori: targetKat.id,
-            keterangan: `[Perintah Chatbot] ${lastMsg.substring(0, 60)}...`,
+            keterangan: tidyKeterangan,
             coaKasId: coaKas.id,
             koperasiId: koperasi.id,
           });
