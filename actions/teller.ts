@@ -309,7 +309,7 @@ export async function processTellerOperasional(input: unknown): Promise<ActionRe
     return { success: true };
   } catch (e) {
     console.error("[TELLER_OPERASIONAL_ERROR]", e);
-    return { success: false, error: "Gagal memproses transaksi operasional kantor di sisi peladen." };
+    return { success: false, error: e instanceof Error ? e.message : "Gagal memproses transaksi operasional kantor di sisi peladen." };
   }
 }
 

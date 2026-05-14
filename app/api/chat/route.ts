@@ -2,7 +2,7 @@ import { streamText, tool } from "ai";
 import { google } from "@ai-sdk/google";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { processTellerSetoran } from "@/actions/teller";
+import { processTellerSetoran, processTellerOperasional } from "@/actions/teller";
 
 export const maxDuration = 60;
 
@@ -97,6 +97,62 @@ export async function POST(req: Request) {
             return {
               success: true,
               message: `Setoran tunai sebesar Rp ${nominal.toLocaleString("id-ID")} berhasil dibukukan ke rekening ${rekeningId}. Jurnal otomatis SSOT telah terbentuk.`,
+            };
+          } else {
+            return { success: false, error: res.error };
+          }
+        },
+      } as any),
+
+      catatOperasionalKantor: tool({
+        description: "Mencatat transaksi kas masuk atau keluar untuk operasional kantor (seperti bayar listrik, ATK, gaji, atau terima fee jasa)",
+        parameters: z.object({
+          jenis: z.enum(["MASUK", "KELUAR"]).describe("Jenis arus kas operasional"),
+          kategoriKode: z.string().describe("Sandi kode kategori, misal: KELUAR-LISTRIK, KELUAR-ATK, KELUAR-GAJI, MASUK-JASA, atau MASUK-LAIN"),
+          nominal: z.number().positive().describe("Jumlah uang dalam Rupiah"),
+          keterangan: z.string().describe("Rincian peruntukan transaksi"),
+        }),
+        execute: async ({ jenis, kategoriKode, nominal, keterangan }: { jenis: "MASUK" | "KELUAR"; kategoriKode: string; nominal: number; keterangan: string }) => {
+          const koperasi = await prisma.koperasi.findFirst();
+          if (!koperasi) return { success: false, error: "Koperasi belum terdaftar." };
+
+          const coaKas = await prisma.chartOfAccount.findFirst({ where: { kodeAkun: "101.01" } });
+          if (!coaKas) return { success: false, error: "Akun Kas utama belum dikonfigurasi." };
+
+          const katDelegate = (prisma as any).kategoriTransaksi;
+          let targetKat = await katDelegate.findFirst({
+            where: { koperasiId: koperasi.id, OR: [{ kode: kategoriKode }, { id: kategoriKode }] },
+          });
+
+          if (!targetKat) {
+            const allCoas = await prisma.chartOfAccount.findMany({ where: { isActive: true } });
+            let targetCoa = allCoas.find((c: any) => c.kodeAkun === (jenis === "MASUK" ? "401.02" : "501.01")) || allCoas[0];
+            
+            targetKat = await katDelegate.create({
+              data: {
+                koperasiId: koperasi.id,
+                kode: kategoriKode.toUpperCase(),
+                nama: `Kategori ${kategoriKode}`,
+                jenis,
+                deskripsi: keterangan,
+                coaId: targetCoa?.id,
+              },
+            });
+          }
+
+          const res = await processTellerOperasional({
+            jenis,
+            nominal,
+            kategori: targetKat.id,
+            keterangan,
+            coaKasId: coaKas.id,
+            koperasiId: koperasi.id,
+          });
+
+          if (res.success) {
+            return {
+              success: true,
+              message: `Transaksi operasional kantor (${jenis}) sebesar Rp ${nominal.toLocaleString("id-ID")} untuk kategori ${targetKat.nama} berhasil dibukukan dengan SSOT seimbang.`,
             };
           } else {
             return { success: false, error: res.error };
@@ -263,6 +319,70 @@ Ketik perintah seperti **"setor 200000"** untuk menginstruksikan pengisian otoma
           simulatedAnswer = `Pencarian untuk anggota bernama **"${term}"** tidak ditemukan di pangkalan data.`;
         }
       }
+      // 2.5 Logika Transaksi Operasional Kantor
+      else if (lastMsg.includes("bayar listrik") || lastMsg.includes("beli atk") || lastMsg.includes("bayar gaji") || lastMsg.includes("operasional") || lastMsg.includes("tagihan") || lastMsg.includes("fee") || lastMsg.includes("jasa")) {
+        const jenis = lastMsg.includes("terima") || lastMsg.includes("pendapatan") ? "MASUK" : "KELUAR";
+        let kategoriKode = "KELUAR-LISTRIK";
+        if (lastMsg.includes("atk") || lastMsg.includes("kertas") || lastMsg.includes("perlengkapan")) kategoriKode = "KELUAR-ATK";
+        else if (lastMsg.includes("gaji") || lastMsg.includes("honor") || lastMsg.includes("upah")) kategoriKode = "KELUAR-GAJI";
+        else if (jenis === "MASUK") kategoriKode = "MASUK-JASA";
+
+        const cleanNumberStr = lastMsg.replace(/rp/g, "").replace(/\./g, "").replace(/,/g, "");
+        const matches = cleanNumberStr.match(/\d+/g);
+        const nominalInput = matches ? Math.max(...matches.map(Number)) : 300000;
+        const nominal = nominalInput < 1000 ? nominalInput * 1000 : nominalInput;
+
+        const koperasi = await prisma.koperasi.findFirst();
+        const coaKas = await prisma.chartOfAccount.findFirst({ where: { kodeAkun: "101.01" } });
+
+        if (koperasi && coaKas) {
+          const katDelegate = (prisma as any).kategoriTransaksi;
+          let targetKat = await katDelegate.findFirst({
+            where: { koperasiId: koperasi.id, OR: [{ kode: kategoriKode }, { id: kategoriKode }] },
+          });
+
+          if (!targetKat) {
+            const allCoas = await prisma.chartOfAccount.findMany({ where: { isActive: true } });
+            let targetCoa = allCoas.find((c: any) => c.kodeAkun === (jenis === "MASUK" ? "401.02" : "501.01")) || allCoas[0];
+            targetKat = await katDelegate.create({
+              data: {
+                koperasiId: koperasi.id,
+                kode: kategoriKode,
+                nama: `Biaya ${kategoriKode}`,
+                jenis,
+                deskripsi: "Pencatatan otomatis via AI Chatbot",
+                coaId: targetCoa?.id,
+              },
+            });
+          }
+
+          const res = await processTellerOperasional({
+            jenis,
+            nominal,
+            kategori: targetKat.id,
+            keterangan: `[Perintah Chatbot] ${lastMsg.substring(0, 60)}...`,
+            coaKasId: coaKas.id,
+            koperasiId: koperasi.id,
+          });
+
+          if (res.success) {
+            simulatedAnswer = `⚡ **Transaksi Operasional Kantor Tereksekusi** ⚡
+
+Saya telah membukukan mutasi operasional kantor secara langsung:
+• **Arus Kas**: **${jenis}**
+• **Kategori**: **${targetKat.nama}** (\`${kategoriKode}\`)
+• **Nominal**: **Rp ${nominal.toLocaleString("id-ID")}**
+• **Status Jurnal**: ✅ Mutlak terbentuk di PostgreSQL
+
+Saldo Kas Utama (101.01) dan pos lawan pada Buku Besar telah disinkronisasikan secara seimbang.`;
+          } else {
+            simulatedAnswer = `❌ **Gagal Memproses Operasional Kantor** ❌
+Alasan sistem: ${res.error}`;
+          }
+        } else {
+          simulatedAnswer = "Entitas Koperasi atau Akun Kas Utama (101.01) belum dikonfigurasi pada sistem.";
+        }
+      }
       // 3. Fallback Panduan SOP Bawaan
       else if (lastMsg.includes("sop") || lastMsg.includes("tanya")) {
         simulatedAnswer = `Berdasarkan **SOP Koperasi-AI**, pencatatan setoran simpanan tunai harus melalui tahapan pembukuan ganda (Double-Entry) terintegrasi berikut:
@@ -276,7 +396,9 @@ Ketik perintah seperti **"setor 200000"** untuk menginstruksikan pengisian otoma
 
 Anda dapat memberikan perintah langsung dalam bahasa alami, contohnya:
 • **"cari anggota [nama]"** untuk memeriksa CIF dan saldo rekening.
-• **"setor 500000"** untuk mencatat setoran tunai dan membentuk jurnal akuntansi seketika.
+• **"setor 500000"** untuk mencatat setoran tunai anggota.
+• **"bayar listrik 300000"** atau **"bayar gaji 5000000"** untuk pengeluaran operasional.
+• **"terima fee jasa 150000"** untuk pendapatan ekstra.
 
 Ada instruksi transaksi yang ingin Anda jalankan hari ini?`;
       }
@@ -290,8 +412,8 @@ Ada instruksi transaksi yang ingin Anda jalankan hari ini?`;
     const systemPrompt = `Anda adalah Asisten AI Core Koperasi mutakhir bernama "Koperasi-AI" dengan peran ganda sebagai Konsultan SOP dan Eksekutor Kasir/Teller.
 Tugas Anda adalah:
 1. Menjawab pertanyaan operasional dengan ringkas dan profesional.
-2. Mengeksekusi pencarian data anggota atau pencatatan setoran tunai HANYA melalui tools yang disediakan jika diminta oleh pengguna.
-Selalu sebutkan ID rekening, nominal, dan konfirmasi pembentukan jurnal SSOT ganda setelah eksekusi.`;
+2. Mengeksekusi pencarian anggota, setoran tunai, atau transaksi operasional kantor HANYA melalui tools yang disediakan jika diminta.
+Selalu sebutkan konfirmasi nominal dan pembentukan jurnal SSOT setelah eksekusi.`;
 
     const result = await streamText({
       model: google("gemini-1.5-pro"),
