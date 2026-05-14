@@ -111,46 +111,95 @@ export async function POST(req: Request) {
 
       // 1. Logika Perintah Transaksi Setoran
       if (lastMsg.includes("setor") || lastMsg.includes("deposit") || lastMsg.includes("tambah saldo")) {
-        const words = lastMsg.split(" ");
-        const cleanWords = words.filter((w: string) => 
-          !["setor", "deposit", "tambah", "saldo", "ke", "rekening", "sebesar", "rp", "tunai"].includes(w) && isNaN(Number(w))
-        );
-        const searchTerm = cleanWords.join(" ").trim();
+        // Deteksi cerdas Anggota secara mutlak dari isi pesan obrolan
+        const semuaAnggota = await prisma.anggota.findMany({
+          where: { status: "AKTIF" },
+          select: { id: true, namaLengkap: true, nik: true },
+        });
+
+        let targetAnggotaId = null;
+        for (const a of semuaAnggota) {
+          if (lastMsg.includes(a.namaLengkap.toLowerCase()) || lastMsg.includes(a.nik.toLowerCase())) {
+            targetAnggotaId = a.id;
+            break;
+          }
+        }
+        if (!targetAnggotaId) {
+          for (const a of semuaAnggota) {
+            const parts = a.namaLengkap.toLowerCase().split(" ").filter((p: string) => p.length > 3);
+            if (parts.some((p: string) => lastMsg.includes(p))) {
+              targetAnggotaId = a.id;
+              break;
+            }
+          }
+        }
+
+        let targetJenis: any = undefined;
+        if (lastMsg.includes("wajib")) targetJenis = "WAJIB";
+        else if (lastMsg.includes("sukarela")) targetJenis = "SUKARELA";
+        else if (lastMsg.includes("pokok")) targetJenis = "POKOK";
 
         let rek = null;
-        if (searchTerm.length > 2) {
-          rek = await prisma.rekeningSimpanan.findFirst({
-            where: {
-              status: "AKTIF",
-              anggota: { namaLengkap: { contains: searchTerm, mode: "insensitive" } },
-              produk: { jenis: "SUKARELA" },
-            },
-            include: { anggota: true, produk: true },
-          });
+        if (targetAnggotaId) {
+          if (targetJenis) {
+            rek = await prisma.rekeningSimpanan.findFirst({
+              where: { status: "AKTIF", anggotaId: targetAnggotaId, produk: { jenis: targetJenis } },
+              include: { anggota: true, produk: true },
+            });
+          }
+          if (!rek) {
+            rek = await prisma.rekeningSimpanan.findFirst({
+              where: { status: "AKTIF", anggotaId: targetAnggotaId, produk: { jenis: { in: ["WAJIB", "SUKARELA"] } } },
+              include: { anggota: true, produk: true },
+            });
+          }
+          if (!rek) {
+            rek = await prisma.rekeningSimpanan.findFirst({
+              where: { status: "AKTIF", anggotaId: targetAnggotaId },
+              include: { anggota: true, produk: true },
+            });
+          }
         }
 
+        // Fallback jika tidak menemukan anggota spesifik dari teks
         if (!rek) {
-          rek = await prisma.rekeningSimpanan.findFirst({
-            where: { status: "AKTIF", produk: { jenis: "SUKARELA" } },
-            include: { anggota: true, produk: true },
-          });
-        }
-
-        if (!rek) {
-          rek = await prisma.rekeningSimpanan.findFirst({
-            where: { status: "AKTIF" },
-            include: { anggota: true, produk: true },
-          });
+          if (targetJenis) {
+            rek = await prisma.rekeningSimpanan.findFirst({
+              where: { status: "AKTIF", produk: { jenis: targetJenis } },
+              include: { anggota: true, produk: true },
+            });
+          } else {
+            rek = await prisma.rekeningSimpanan.findFirst({
+              where: { status: "AKTIF", produk: { jenis: "SUKARELA" } },
+              include: { anggota: true, produk: true },
+            });
+            if (!rek) {
+              rek = await prisma.rekeningSimpanan.findFirst({
+                where: { status: "AKTIF" },
+                include: { anggota: true, produk: true },
+              });
+            }
+          }
         }
 
         if (rek) {
-          const match = lastMsg.match(/\d+/g);
-          const nominalInput = match ? Math.max(...match.map(Number)) : 100000;
+          // Ekstrak angka dengan membersihkan tanda titik/koma format mata uang terlebih dahulu
+          const cleanNumberStr = lastMsg.replace(/\bsebesar\b/g, "").replace(/rp/g, "").replace(/\./g, "").replace(/,/g, "");
+          const matches = cleanNumberStr.match(/\d+/g);
+          const nominalInput = matches ? Math.max(...matches.map(Number)) : 50000;
           const nominal = nominalInput < 1000 ? nominalInput * 1000 : nominalInput;
 
           const koperasi = await prisma.koperasi.findFirst();
           const coaKas = await prisma.chartOfAccount.findFirst({ where: { kodeAkun: "101.01" } });
-          const coaSimpanan = await prisma.chartOfAccount.findFirst({ where: { kodeAkun: "201.01" } }) 
+          
+          // Resolusi presisi Akun Simpanan di Buku Besar sesuai standar PSAK
+          const actualJenis = rek.produk?.jenis || "SUKARELA";
+          let targetKodeAkun = "201.01";
+          if (actualJenis === "WAJIB") targetKodeAkun = "301.02";
+          else if (actualJenis === "POKOK") targetKodeAkun = "301.01";
+
+          const coaSimpanan = await prisma.chartOfAccount.findFirst({ where: { kodeAkun: targetKodeAkun } }) 
+            || await prisma.chartOfAccount.findFirst({ where: { kodeAkun: "201.01" } })
             || await prisma.chartOfAccount.findFirst({ where: { tipe: "LIABILITY" } });
 
           if (koperasi && coaKas && coaSimpanan) {
@@ -158,7 +207,7 @@ export async function POST(req: Request) {
               rekeningId: rek.id,
               nominal,
               metode: "TUNAI",
-              keterangan: `Setoran tunai otomatis via Perintah Chatbot AI (${searchTerm || 'Umum'})`,
+              keterangan: `Setoran tunai otomatis via Perintah Chatbot AI (${actualJenis})`,
               coaKasId: coaKas.id,
               coaSimpananId: coaSimpanan.id,
               koperasiId: koperasi.id,
@@ -168,26 +217,26 @@ export async function POST(req: Request) {
               simulatedAnswer = `⚡ **Instruksi Transaksi Diterima & Dieksekusi** ⚡
 
 Saya telah menjalankan tugas Kasir/Teller untuk mencatat setoran tunai riil pada sistem:
-• **Anggota**: ${rek.anggota?.namaLengkap}
+• **Anggota Target**: **${rek.anggota?.namaLengkap}**
 • **Rekening ID**: \`${rek.id}\`
-• **Produk**: ${rek.produk?.namaProduk}
+• **Produk**: **${rek.produk?.namaProduk}** (\`${actualJenis}\`)
 • **Nominal Setoran**: **Rp ${nominal.toLocaleString("id-ID")}**
-• **Status Pembukuan**: ✅ Berhasil dibukukan ke PostgreSQL
+• **Status Pembukuan**: ✅ Berhasil dibukukan secara mutlak ke PostgreSQL
 
-Jurnal akuntansi **Dr. Kas Tunai Teller (101.01)** dan **Cr. Simpanan Anggota** telah terbentuk secara mutlak pada Buku Besar dan singgahan antarmuka telah dimutakhirkan.`;
+Jurnal akuntansi **Dr. Kas Tunai Teller (101.01)** dan **Cr. ${coaSimpanan.namaAkun} (${coaSimpanan.kodeAkun})** telah terbentuk seketika pada Buku Besar dan singgahan dasbor telah dimutakhirkan.`;
             } else {
               simulatedAnswer = `❌ **Transaksi Ditolak oleh Mesin Validasi** ❌
 
 Upaya pencatatan setoran ke rekening \`${rek.id}\` (${rek.produk?.namaProduk}) milik **${rek.anggota?.namaLengkap}** tidak dapat dilanjutkan.
-• **Alasan Validasi**: ${res.error}
+• **Alasan Validasi Sistem**: ${res.error}
 
-*Solusi*: Perintah setoran berulang sebaiknya ditujukan pada akun **Simpanan Sukarela** (karena Simpanan Pokok hanya diizinkan satu kali penyetoran di awal keanggotaan).`;
+*Saran Operasional*: Perintah setoran berulang sebaiknya ditujukan pada produk **Simpanan Wajib** atau **Simpanan Sukarela** (karena Simpanan Pokok hanya diizinkan satu kali penyetoran di awal keanggotaan).`;
             }
           } else {
             simulatedAnswer = "Konfigurasi standar Buku Besar (CoA Kas/Simpanan) atau entitas Koperasi belum lengkap di pangkalan data.";
           }
         } else {
-          simulatedAnswer = "Mohon maaf, belum ada rekening simpanan berstatus AKTIF (terutama Simpanan Sukarela) yang dapat dijadikan target setoran otomatis saat ini.";
+          simulatedAnswer = "Mohon maaf, tidak ditemukan target rekening simpanan berstatus AKTIF yang cocok dengan parameter pencarian Anda.";
         }
       }
       // 2. Logika Perintah Pencarian Anggota

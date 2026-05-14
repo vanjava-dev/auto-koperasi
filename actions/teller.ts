@@ -122,7 +122,7 @@ export async function processTellerSetoran(input: unknown): Promise<ActionResult
     return { success: true };
   } catch (e) {
     console.error("[TELLER_SETORAN_ERROR]", e);
-    return { success: false, error: "Gagal memproses setoran. Silakan coba lagi." };
+    return { success: false, error: e instanceof Error ? e.message : "Gagal memproses setoran. Silakan coba lagi." };
   }
 }
 
