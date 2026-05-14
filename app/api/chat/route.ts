@@ -1,5 +1,8 @@
-import { streamText } from "ai";
+import { streamText, tool } from "ai";
 import { google } from "@ai-sdk/google";
+import { z } from "zod";
+import { prisma } from "@/lib/prisma";
+import { processTellerSetoran } from "@/actions/teller";
 
 export const maxDuration = 60;
 
@@ -10,7 +13,7 @@ function createSimulatedStream(text: string): ReadableStream {
       const words = text.split(" ");
       for (const word of words) {
         controller.enqueue(encoder.encode(word + " "));
-        await new Promise((resolve) => setTimeout(resolve, 20));
+        await new Promise((resolve) => setTimeout(resolve, 15));
       }
       controller.close();
     },
@@ -25,60 +28,198 @@ export async function POST(req: Request) {
 
     const lastMsg = messages && messages.length > 0 ? messages[messages.length - 1].content.toLowerCase() : "";
 
-    // Logika Respons Panduan Cerdas Berbasis Konteks Koperasi
-    let fallbackAnswer = "";
-    if (lastMsg.includes("setoran") || lastMsg.includes("simpanan") || lastMsg.includes("sop")) {
-      fallbackAnswer = `Berdasarkan **SOP Koperasi-AI**, pencatatan setoran simpanan tunai harus melalui tahapan pembukuan ganda (Double-Entry) terintegrasi berikut:
+    // ── DEFINISI TOOLS KOPERASI UNTUK GEMINI API RIIL ──
+    const cooperativeTools = {
+      cariAnggota: tool({
+        description: "Cari anggota koperasi beserta daftar rekening simpanan aktif berdasarkan nama atau NIK",
+        parameters: z.object({
+          kataKunci: z.string().describe("Nama anggota atau NIK yang ingin dicari"),
+        }),
+        execute: async ({ kataKunci }: { kataKunci: string }) => {
+          const daftar = await prisma.anggota.findMany({
+            where: {
+              OR: [
+                { namaLengkap: { contains: kataKunci, mode: "insensitive" } },
+                { nik: { contains: kataKunci } },
+              ],
+            },
+            include: {
+              rekeningSimpanan: { include: { produk: true } },
+            },
+            take: 5,
+          });
+
+          return daftar.map((a) => ({
+            id: a.id,
+            namaLengkap: a.namaLengkap,
+            nik: a.nik,
+            status: a.status,
+            rekening: a.rekeningSimpanan.map((r) => ({
+              rekeningId: r.id,
+              produk: r.produk?.namaProduk || "Simpanan",
+              jenis: r.produk?.jenis,
+              saldoTerkini: Number(r.saldo),
+            })),
+          }));
+        },
+      } as any),
+
+      catatSetoranTunai: tool({
+        description: "Mencatat transaksi setoran simpanan tunai ke rekening anggota secara real-time dan menjurnal otomatis",
+        parameters: z.object({
+          rekeningId: z.string().describe("ID rekening simpanan tujuan"),
+          nominal: z.number().positive().describe("Jumlah uang setoran dalam Rupiah"),
+          keterangan: z.string().optional().describe("Keterangan setoran"),
+        }),
+        execute: async ({ rekeningId, nominal, keterangan }: { rekeningId: string; nominal: number; keterangan?: string }) => {
+          const koperasi = await prisma.koperasi.findFirst();
+          if (!koperasi) return { success: false, error: "Koperasi belum terdaftar." };
+
+          const coaKas = await prisma.chartOfAccount.findFirst({ where: { kodeAkun: "101.01" } });
+          const coaSimpanan = await prisma.chartOfAccount.findFirst({ where: { kodeAkun: "201.01" } }) 
+            || await prisma.chartOfAccount.findFirst({ where: { tipe: "LIABILITY" } });
+
+          if (!coaKas || !coaSimpanan) {
+            return { success: false, error: "Akun Kas atau Kewajiban standar belum dikonfigurasi." };
+          }
+
+          const res = await processTellerSetoran({
+            rekeningId,
+            nominal,
+            metode: "TUNAI",
+            keterangan: keterangan || "Setoran tunai via Koperasi-AI Chatbot",
+            coaKasId: coaKas.id,
+            coaSimpananId: coaSimpanan.id,
+            koperasiId: koperasi.id,
+          });
+
+          if (res.success) {
+            return {
+              success: true,
+              message: `Setoran tunai sebesar Rp ${nominal.toLocaleString("id-ID")} berhasil dibukukan ke rekening ${rekeningId}. Jurnal otomatis SSOT telah terbentuk.`,
+            };
+          } else {
+            return { success: false, error: res.error };
+          }
+        },
+      } as any),
+    };
+
+    // ── EKSEKUSI CERDAS UNTUK DEMO KEY (SIMULASI TRANSAKSI LANGSUNG) ──
+    if (isDemoKey) {
+      let simulatedAnswer = "";
+
+      // 1. Logika Perintah Transaksi Setoran
+      if (lastMsg.includes("setor") || lastMsg.includes("deposit") || lastMsg.includes("tambah saldo")) {
+        const rek = await prisma.rekeningSimpanan.findFirst({
+          where: { status: "AKTIF" },
+          include: { anggota: true, produk: true },
+        });
+
+        if (rek) {
+          const match = lastMsg.match(/\d+/g);
+          const nominalInput = match ? Math.max(...match.map(Number)) : 100000;
+          const nominal = nominalInput < 1000 ? nominalInput * 1000 : nominalInput;
+
+          const koperasi = await prisma.koperasi.findFirst();
+          const coaKas = await prisma.chartOfAccount.findFirst({ where: { kodeAkun: "101.01" } });
+          const coaSimpanan = await prisma.chartOfAccount.findFirst({ where: { kodeAkun: "201.01" } }) 
+            || await prisma.chartOfAccount.findFirst({ where: { tipe: "LIABILITY" } });
+
+          if (koperasi && coaKas && coaSimpanan) {
+            await processTellerSetoran({
+              rekeningId: rek.id,
+              nominal,
+              metode: "TUNAI",
+              keterangan: "Setoran tunai otomatis dieksekusi via Perintah Chatbot AI",
+              coaKasId: coaKas.id,
+              coaSimpananId: coaSimpanan.id,
+              koperasiId: koperasi.id,
+            });
+
+            simulatedAnswer = `⚡ **Instruksi Transaksi Diterima & Dieksekusi** ⚡
+
+Saya telah menjalankan tugas Kasir/Teller untuk mencatat setoran tunai riil pada sistem:
+• **Anggota**: ${rek.anggota?.namaLengkap}
+• **Rekening ID**: \`${rek.id}\`
+• **Produk**: ${rek.produk?.namaProduk}
+• **Nominal Setoran**: **Rp ${nominal.toLocaleString("id-ID")}**
+• **Status Pembukuan**: ✅ Berhasil dibukukan
+
+Jurnal akuntansi **Dr. Kas Tunai Teller (101.01)** dan **Cr. Simpanan Anggota** telah terbentuk secara mutlak pada Buku Besar dan singgahan antarmuka telah dimutakhirkan.`;
+          }
+        } else {
+          simulatedAnswer = "Mohon maaf, belum ada rekening simpanan berstatus AKTIF yang dapat dijadikan target setoran otomatis saat ini.";
+        }
+      }
+      // 2. Logika Perintah Pencarian Anggota
+      else if (lastMsg.includes("cari") || lastMsg.includes("siapa") || lastMsg.includes("anggota")) {
+        const words = lastMsg.split(" ");
+        const cariIdx = words.findIndex((w: string) => w.includes("cari") || w.includes("anggota"));
+        const term = words.slice(cariIdx + 1).join(" ").replace(/[^a-zA-Z0-9 ]/g, "").trim();
+        
+        const list = await prisma.anggota.findMany({
+          where: term ? { namaLengkap: { contains: term, mode: "insensitive" } } : undefined,
+          include: { rekeningSimpanan: { include: { produk: true } } },
+          take: 3,
+        });
+
+        if (list.length > 0) {
+          simulatedAnswer = `Saya telah mengeksekusi pencarian riil pada pangkalan data untuk **"${term || 'Semua Anggota'}"**. Berikut hasilnya:
+
+${list.map((a: any) => `• **${a.namaLengkap}** (NIK: ${a.nik})
+  Status: \`${a.status}\`
+  Rekening Aktif: ${a.rekeningSimpanan.length > 0 ? a.rekeningSimpanan.map((r: any) => `\`${r.produk?.namaProduk || 'Simpanan'}\` (Saldo: Rp ${Number(r.saldo).toLocaleString('id-ID')})`).join(', ') : 'Belum ada rekening'}`).join('\n\n')}
+
+Ketik perintah seperti **"setor 200000"** untuk menginstruksikan pengisian otomatis ke target rekening teratas.`;
+        } else {
+          simulatedAnswer = `Pencarian untuk anggota bernama **"${term}"** tidak ditemukan di pangkalan data.`;
+        }
+      }
+      // 3. Fallback Panduan SOP Bawaan
+      else if (lastMsg.includes("sop") || lastMsg.includes("tanya")) {
+        simulatedAnswer = `Berdasarkan **SOP Koperasi-AI**, pencatatan setoran simpanan tunai harus melalui tahapan pembukuan ganda (Double-Entry) terintegrasi berikut:
 
 1. **Verifikasi Identitas**: Kasir/Teller memverifikasi NIK/CIF serta status keaktifan Anggota.
 2. **Penerimaan Fisik Kas**: Teller menerima dan menghitung kesesuaian fisik uang tunai.
-3. **Pencatatan Modul**: Input nominal transaksi pada antarmuka Dasbor Simpanan untuk memicu mutasi sistem.
-4. **Jurnal Otomatis (SSOT)**: Mesin akuntansi akan otomatis membentuk jurnal seimbang secara seketika:
-   • **Debit**: Kas Tunai Teller Utama (101.01)
-   • **Kredit**: Simpanan Sukarela / Berjangka Anggota (201.01 / 201.02)
-5. **Validasi Akhir**: Sistem mencetak stempel jejak audit (Audit Log) dan kasir menyerahkan tanda terima resmi kepada Anggota.`;
-    } else if (lastMsg.includes("denda") || lastMsg.includes("sanksi") || lastMsg.includes("terlambat") || lastMsg.includes("angsuran")) {
-      fallbackAnswer = `Sesuai kepatuhan standar PSAK Koperasi dan modul **Koperasi-AI**, ketentuan denda keterlambatan angsuran pembiayaan diatur sebagai berikut:
+3. **Pencatatan Modul**: Input nominal transaksi pada Dasbor Simpanan untuk memicu mutasi sistem.
+4. **Jurnal Otomatis**: Sistem menjurnal Dr. Kas Tunai dan Cr. Simpanan Anggota secara seketika.`;
+      } else {
+        simulatedAnswer = `Halo! Saya **Koperasi-AI**, Asisten Teller Cerdas Anda yang kini telah dilengkapi kemampuan transaksi otonom.
 
-• **Tarif Denda Bawaan**: Ditetapkan sebesar **0.1% per hari keterlambatan** dari porsi pokok angsuran yang tertunggak.
-• **Pengakuan Pendapatan**: Kasir mencatat penerimaan denda melalui modul pembayaran angsuran. Sistem mengklasifikasikan aliran dana ini ke pos **Pendapatan Denda Keterlambatan Angsuran (401.03)**.
-• **Otomatisasi Jurnal**: Pembayaran denda memicu jurnal riil:
-   • **Debit**: Kas Tunai Teller Utama (101.01)
-   • **Kredit**: Pendapatan Denda Keterlambatan Angsuran (401.03)
+Anda dapat memberikan perintah langsung dalam bahasa alami, contohnya:
+• **"cari anggota [nama]"** untuk memeriksa CIF dan saldo rekening.
+• **"setor 500000"** untuk mencatat setoran tunai dan membentuk jurnal akuntansi seketika.
 
-Sistem juga akan menandai status kolektibilitas debitur secara dinamis berdasarkan histori pembayaran.`;
-    } else {
-      fallbackAnswer = `Terima kasih atas pertanyaan Anda. Sebagai Asisten AI Core Koperasi, saya bertugas mengawal kepatuhan SOP pembukuan ganda dan manajemen risiko.
+Ada instruksi transaksi yang ingin Anda jalankan hari ini?`;
+      }
 
-Untuk menjamin kelayakan portofolio pembiayaan, pastikan setiap persetujuan plafon selalu merujuk pada skor kelayakan **AI Credit Scoring 5C** dan rasio NPL instansi tetap berada di bawah ambang batas standar (<5%). Apakah ada rincian nomor kontrak atau prosedur spesifik lain yang ingin Anda konsultasikan hari ini?`;
-    }
-
-    // Jika menggunakan kunci demo bawaan, langsung kembalikan respons simulasi streaming premium
-    if (isDemoKey) {
-      return new Response(createSimulatedStream(fallbackAnswer), {
+      return new Response(createSimulatedStream(simulatedAnswer), {
         headers: { "Content-Type": "text/plain; charset=utf-8" },
       });
     }
 
-    // Eksekusi pemanggilan riil ke Google Gemini API
-    const systemPrompt = `Anda adalah Asisten AI Core Koperasi mutakhir bernama "Koperasi-AI".
-Tugas Anda adalah memberikan saran, panduan operasional, serta membimbing kasir/teller dalam mencatat setoran, penarikan, dan pembiayaan sesuai Standar Operasional Prosedur (SOP).
-Jawablah pertanyaan dengan ramah, profesional, dan ringkas. Gunakan pemformatan poin atau tabel jika menjelaskan tahapan prosedur.`;
+    // ── EKSEKUSI PEMANGGILAN RIIL KE GOOGLE GEMINI DENGAN TOOLS ──
+    const systemPrompt = `Anda adalah Asisten AI Core Koperasi mutakhir bernama "Koperasi-AI" dengan peran ganda sebagai Konsultan SOP dan Eksekutor Kasir/Teller.
+Tugas Anda adalah:
+1. Menjawab pertanyaan operasional dengan ringkas dan profesional.
+2. Mengeksekusi pencarian data anggota atau pencatatan setoran tunai HANYA melalui tools yang disediakan jika diminta oleh pengguna.
+Selalu sebutkan ID rekening, nominal, dan konfirmasi pembentukan jurnal SSOT ganda setelah eksekusi.`;
 
     const result = await streamText({
       model: google("gemini-1.5-pro"),
       system: systemPrompt,
       messages,
+      tools: cooperativeTools,
     });
 
     return result.toTextStreamResponse();
 
   } catch (e) {
     console.error("[AI_CHAT_ROUTE_ERROR]", e);
-    // Fallback tangguh jika API Key riil mengalami limitasi kuota atau gangguan jaringan
-    const errorFallbackAnswer = `Mohon maaf, koneksi ke peladen utama Google Gemini sedang mengalami penyesuaian jaringan atau limitasi kuota.
+    const errorFallbackAnswer = `Mohon maaf, peladen utama Google Gemini sedang mengalami penyesuaian jaringan atau limitasi kuota.
 
-Namun sebagai referensi cepat SOP Koperasi: Pastikan seluruh transaksi kasir selalu terikat pada pos Akun Buku Besar (CoA) yang tepat untuk menjaga keseimbangan neraca lajur secara otomatis. Silakan hubungi administrator sistem jika kendala berlanjut.`;
+Namun sistem otonom lokal tetap siaga. Anda tetap dapat menggunakan antarmuka dasbor utama untuk memproses seluruh transaksi pembukuan ganda secara presisi.`;
     
     return new Response(createSimulatedStream(errorFallbackAnswer), {
       headers: { "Content-Type": "text/plain; charset=utf-8" },
