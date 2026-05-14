@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { getAnggotaListAction, createAnggotaAction } from "@/actions/anggota-action";
+import { getAnggotaListAction, createAnggotaAction, updateAnggotaAction, generateAktivasiInvoiceAction, activateAnggotaManualAction } from "@/actions/anggota-action";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { 
@@ -23,8 +23,10 @@ import { TablePagination } from "@/components/shared/TableHelper";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { scanKtpFromUrlAction } from "@/actions/ocr-bridge";
 import { FeedbackModal, FeedbackType } from "@/components/shared/FeedbackModal";
+import { useRouter } from "next/navigation";
 
 export default function AnggotaPage() {
+  const router = useRouter();
   const [currentPage, setCurrentPage] = useState(1);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [isOcrScanning, setIsOcrScanning] = useState(false);
@@ -38,6 +40,7 @@ export default function AnggotaPage() {
 
   // Nama berkas lokal yang diunggah
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+  const [editRealId, setEditRealId] = useState<string | null>(null);
 
   // Form registrasi
   const [regForm, setRegForm] = useState({
@@ -49,7 +52,6 @@ export default function AnggotaPage() {
     jenisKelamin: "",
   });
 
-  // State Modal Umpan Balik
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
     type: FeedbackType;
@@ -62,34 +64,43 @@ export default function AnggotaPage() {
     description: "",
   });
 
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [paymentData, setPaymentData] = useState<any>(null);
+
+
+
   const showModal = (type: FeedbackType, title: string, description: string) => {
     setModalState({ isOpen: true, type, title, description });
   };
 
   // Senarai anggota dinamis
-  const [membersData, setMembersData] = useState<any[]>([
-    { id: "M-001", nik: "3171234567890001", name: "Budi Santoso", status: "Aktif", date: "10 Jan 2024", savings: 2450000, gender: "Laki-Laki", address: "Jl. Sudirman Kav. 1", ocrVerified: true },
-  ]);
+  const [membersData, setMembersData] = useState<any[]>([]);
 
   const loadRealMembers = async () => {
     try {
       const res = await getAnggotaListAction();
-      if (res?.success && res.data && res.data.length > 0) {
+      if (res?.success && Array.isArray(res.data)) {
         setMembersData(res.data.map((m: any, idx: number) => {
           const totalSimp = m.rekeningSimpanan && m.rekeningSimpanan.length > 0
             ? m.rekeningSimpanan.reduce((acc: number, r: any) => acc + Number(r.saldo), 0)
-            : 500000;
+            : 0;
+          const tglObj = m.tanggalLahir ? new Date(m.tanggalLahir) : null;
+          const tglStr = tglObj ? tglObj.toISOString().split("T")[0] : "";
           return {
-            id: `M-${String(idx + 1).padStart(3, "0")}`,
+            id: m.cif || `1026${String(idx + 1).padStart(6, "0")}`,
             realId: m.id,
             nik: m.nik,
             name: m.namaLengkap,
             status: m.status === "AKTIF" ? "Aktif" : m.status === "MENUNGGU" ? "Menunggu" : "Pasif",
             date: new Date(m.createdAt).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }),
             savings: totalSimp,
-            gender: "Laki-Laki",
+            gender: m.jenisKelamin || "Laki-Laki",
             address: m.alamat || "-",
+            tempatLahir: m.tempatLahir || "",
+            tglLahir: tglStr,
             ocrVerified: m.ocrVerified,
+            noHp: m.noHp || "-",
+            rawObj: m,
           };
         }));
       }
@@ -155,8 +166,8 @@ export default function AnggotaPage() {
 
       showModal(
         "success",
-        "Tangkapan Rana Kamera Sukses",
-        "AI Vision Engine telah mengunci titik piksel kartu identitas melalui antarmuka kamera terenkripsi dan memproyeksikan seluruh kolom atribut data secara otomatis."
+        "Tangkapan Kamera Sukses",
+        "Foto e-KTP berhasil ditangkap dan atribut data otomatis terisi."
       );
     }, 1500);
   };
@@ -198,58 +209,74 @@ export default function AnggotaPage() {
 
   const handleSimpanAnggota = async () => {
     if (!regForm.nama || !regForm.nik) {
-      showModal("warning", "Isian Tidak Lengkap", "Harap lengkapi minimal NIK dan Nama Lengkap anggota atau gunakan pemicu unggah berkas/kamera untuk pengisian otomatis.");
+      showModal("warning", "Isian Tidak Lengkap", "Harap lengkapi minimal NIK dan Nama Lengkap anggota.");
       return;
     }
 
     try {
-      const res = await createAnggotaAction({
-        nik: regForm.nik,
-        namaLengkap: regForm.nama,
-        alamat: regForm.alamat,
-        tempatLahir: regForm.tempatLahir,
-        tanggalLahir: regForm.tglLahir,
-        jenisKelamin: regForm.jenisKelamin,
-        ocrVerified: ocrSuccess,
-      });
+      if (editRealId) {
+        const res = await updateAnggotaAction(editRealId, {
+          nik: regForm.nik,
+          namaLengkap: regForm.nama,
+          alamat: regForm.alamat,
+          tempatLahir: regForm.tempatLahir,
+          tanggalLahir: regForm.tglLahir,
+          jenisKelamin: regForm.jenisKelamin,
+        });
 
-      if (res.success) {
-        await loadRealMembers();
-        setIsRegisterOpen(false);
-        showModal(
-          "success",
-          "Anggota Baru Berhasil Terdaftar",
-          `Biodata atas nama ${regForm.nama} (${regForm.nik}) telah berhasil didaftarkan secara persisten ke PostgreSQL. Rekening simpanan pokok otomatis diinisialisasi berserta rekam jejak stempel audit absolut.`
-        );
-
-        // Reset
-        setRegForm({ nik: "", nama: "", alamat: "", tempatLahir: "", tglLahir: "", jenisKelamin: "" });
-        setKtpUrlInput("");
-        setSelectedFileName(null);
-        setOcrSuccess(false);
+        if (res.success) {
+          await loadRealMembers();
+          setIsRegisterOpen(false);
+          showModal("success", "Pembaruan Berhasil", `Data profil anggota ${regForm.nama} berhasil diperbarui.`);
+          setRegForm({ nik: "", nama: "", alamat: "", tempatLahir: "", tglLahir: "", jenisKelamin: "" });
+          setEditRealId(null);
+        } else {
+          showModal("warning", "Gagal Memperbarui", res.error || "Terjadi galat saat memperbarui data.");
+        }
       } else {
-        showModal("warning", "Gagal Mendaftarkan Anggota", res.error || "Terjadi galat saat menyimpan ke pangkalan data.");
+        const res = await createAnggotaAction({
+          nik: regForm.nik,
+          namaLengkap: regForm.nama,
+          alamat: regForm.alamat,
+          tempatLahir: regForm.tempatLahir,
+          tanggalLahir: regForm.tglLahir,
+          jenisKelamin: regForm.jenisKelamin,
+          ocrVerified: ocrSuccess,
+        });
+
+        if (res.success) {
+          await loadRealMembers();
+          setIsRegisterOpen(false);
+          showModal("success", "Pendaftaran Berhasil", `Data anggota ${regForm.nama} (${regForm.nik}) berhasil didaftarkan.`);
+          setRegForm({ nik: "", nama: "", alamat: "", tempatLahir: "", tglLahir: "", jenisKelamin: "" });
+          setKtpUrlInput("");
+          setSelectedFileName(null);
+          setOcrSuccess(false);
+        } else {
+          showModal("warning", "Gagal Mendaftarkan Anggota", res.error || "Terjadi galat saat menyimpan ke pangkalan data.");
+        }
       }
     } catch (e: any) {
-      showModal("warning", "Galat Peladen", "Koneksi ke peladen terputus saat menyimpan keanggotaan.");
+      showModal("warning", "Galat Peladen", "Koneksi ke peladen terputus saat menyimpan data.");
     }
   };
 
   const handleLihatDetail = (row: any) => {
-    showModal(
-      "success",
-      `Detail Keanggotaan: ${row.name}`,
-      `ID Anggota: ${row.id}\nNIK Kependudukan: ${row.nik}\nStatus: ${row.status}\nBergabung: ${row.date}\nTotal Simpanan: Rp ${row.savings.toLocaleString("id-ID")}\nAlamat Domisili: ${row.address}`
-    );
+    if (row.realId) {
+      router.push(`/anggota/${encodeURIComponent(row.realId)}`);
+    } else {
+      showModal("warning", "ID Tidak Valid", "Pengenal pangkalan data anggota tidak ditemukan.");
+    }
   };
 
   const handleEditAnggota = (row: any) => {
+    setEditRealId(row.realId);
     setRegForm({
       nik: row.nik,
       nama: row.name,
-      alamat: row.address,
-      tempatLahir: "JAKARTA",
-      tglLahir: "1990-01-01",
+      alamat: row.address === "-" ? "" : row.address,
+      tempatLahir: row.tempatLahir,
+      tglLahir: row.tglLahir,
       jenisKelamin: row.gender.toUpperCase(),
     });
     setIsRegisterOpen(true);
@@ -258,8 +285,8 @@ export default function AnggotaPage() {
   const handleEksporData = () => {
     showModal(
       "success",
-      "Ekspor Buku Induk Selesai",
-      `Data ${membersData.length} anggota koperasi aktif/pasif berformat CSV telah siap diunduh dengan penandatanganan stempel digital terenkripsi.`
+      "Ekspor Selesai",
+      `Data ${membersData.length} anggota berhasil diekspor ke berkas CSV.`
     );
   };
 
@@ -290,6 +317,7 @@ export default function AnggotaPage() {
             size="sm"
             className="bg-blue-600 hover:bg-blue-700 text-xs text-white h-9 shadow-md"
             onClick={() => {
+              setEditRealId(null);
               setRegForm({ nik: "", nama: "", alamat: "", tempatLahir: "", tglLahir: "", jenisKelamin: "" });
               setKtpUrlInput("");
               setSelectedFileName(null);
@@ -311,7 +339,7 @@ export default function AnggotaPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
-              placeholder="Cari berdasarkan NIK, Nama, atau ID..."
+              placeholder="Cari berdasarkan NIK, Nama, atau CIF..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full h-9 pl-9 pr-4 text-xs rounded-lg border border-slate-200 focus:outline-none focus:border-blue-500 text-slate-900 placeholder:text-slate-400 font-medium"
@@ -326,7 +354,7 @@ export default function AnggotaPage() {
           <Table className="min-w-[750px]">
             <TableHeader>
               <TableRow>
-                <TableHead className="th-standard pl-6">ID</TableHead>
+                <TableHead className="th-standard pl-6">Nomor CIF</TableHead>
                 <TableHead className="th-standard">Identitas / NIK</TableHead>
                 <TableHead className="th-standard">Nama Lengkap</TableHead>
                 <TableHead className="th-standard">Tanggal Bergabung</TableHead>
@@ -371,6 +399,25 @@ export default function AnggotaPage() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right pr-6 space-x-1">
+                    {row.status.toUpperCase() === "MENUNGGU" && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={async () => {
+                          const res = await generateAktivasiInvoiceAction(row.realId);
+                          if (res.success) {
+                            setPaymentData({ ...res, anggotaId: row.realId });
+                            setIsPaymentModalOpen(true);
+                          } else {
+                            showModal("warning", "Gagal Membuat Tagihan", res.error || "Gagal menerbitkan tagihan aktivasi Xendit.");
+                          }
+                        }}
+                        className="w-7 h-7 text-amber-500 hover:text-amber-600 hover:bg-amber-50"
+                        title="Buat Tagihan Aktivasi (Xendit)"
+                      >
+                        <LinkIcon className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="icon"
@@ -637,6 +684,95 @@ export default function AnggotaPage() {
               Simpan & Verifikasi
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Modal Simulasi Pembayaran Xendit ── */}
+      <Dialog open={isPaymentModalOpen} onOpenChange={setIsPaymentModalOpen}>
+        <DialogContent className="sm:max-w-[400px] p-6 border-none shadow-2xl rounded-2xl overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500"></div>
+          <DialogHeader className="mb-4">
+            <DialogTitle className="text-xl font-bold text-slate-900 flex items-center justify-center gap-2">
+              <span className="bg-blue-100 text-blue-700 p-1.5 rounded-full">
+                <LinkIcon className="w-5 h-5" />
+              </span>
+              Tagihan Aktivasi
+            </DialogTitle>
+            <DialogDescription className="text-center text-xs text-slate-500 mt-2">
+              Selesaikan pembayaran untuk mengaktifkan keanggotaan ini.
+            </DialogDescription>
+          </DialogHeader>
+
+          {paymentData && (
+            <div className="space-y-5">
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col items-center justify-center">
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total Tagihan</p>
+                <p className="text-3xl font-black text-slate-900 tracking-tight">
+                  Rp {paymentData.totalTagihan?.toLocaleString("id-ID")}
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <div className="p-3 bg-white border border-slate-200 rounded-xl shadow-sm hover:border-blue-300 transition-colors cursor-default">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-xs font-bold flex items-center gap-1.5 text-slate-700">
+                      <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                      Virtual Account ({paymentData.paymentDetails?.bankName})
+                    </span>
+                  </div>
+                  <div className="bg-slate-100 p-2 rounded-lg text-center font-mono font-bold text-lg text-slate-800 tracking-wider">
+                    {paymentData.paymentDetails?.vaNumber}
+                  </div>
+                </div>
+
+                <div className="p-3 bg-white border border-slate-200 rounded-xl shadow-sm hover:border-blue-300 transition-colors cursor-default">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-xs font-bold flex items-center gap-1.5 text-slate-700">
+                      <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                      Kode QRIS Nasional
+                    </span>
+                  </div>
+                  <div className="flex justify-center bg-white p-3 border border-slate-100 rounded-lg shadow-inner">
+                    {/* Placeholder QRIS Code Image */}
+                    <div className="w-32 h-32 bg-slate-200 flex items-center justify-center rounded-md border-2 border-dashed border-slate-300 relative overflow-hidden">
+                       <div className="absolute inset-0 grid grid-cols-4 grid-rows-4 gap-1 p-2 opacity-50">
+                          {Array.from({length: 16}).map((_, i) => (
+                             <div key={i} className="bg-slate-800 rounded-[2px]" style={{opacity: Math.random()}}></div>
+                          ))}
+                       </div>
+                       <Scan className="w-8 h-8 text-slate-400 relative z-10" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter className="flex flex-col sm:flex-row gap-2 mt-4 pt-4 border-t border-slate-100">
+                <Button 
+                  variant="outline" 
+                  className="w-full text-xs font-semibold h-10 border-slate-200"
+                  onClick={() => setIsPaymentModalOpen(false)}
+                >
+                  Tutup Tagihan
+                </Button>
+                <Button 
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold h-10 shadow-md flex items-center justify-center gap-1.5"
+                  onClick={async () => {
+                     if (!paymentData?.anggotaId) return;
+                     const res = await activateAnggotaManualAction(paymentData.anggotaId);
+                     setIsPaymentModalOpen(false);
+                     if (res.success) {
+                       await loadRealMembers();
+                       showModal("success", "Aktivasi Tunai Berhasil", "Pembayaran tunai telah dibukukan oleh kasir teller. Status keanggotaan kini aktif beserta pembukuan jurnal ganda otomatis.");
+                     } else {
+                       showModal("warning", "Gagal Aktivasi", res.error || "Terjadi kesalahan saat memproses aktivasi tunai.");
+                     }
+                  }}
+                >
+                  <CheckCircle2 className="w-4 h-4" /> Bayar Tunai (Manual)
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

@@ -10,6 +10,7 @@ import { TablePagination, TableEmptyState } from "@/components/shared/TableHelpe
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { FeedbackModal, FeedbackType } from "@/components/shared/FeedbackModal";
 import { analyzeCreditScoreAction } from "@/actions/credit-score-bridge";
+import { getPinjamanDashboardDataAction, createPinjamanAction, cairkanPinjamanAction } from "@/actions/pinjaman-action";
 
 export default function PinjamanPage() {
   const [currentPage, setCurrentPage] = useState(1);
@@ -38,8 +39,8 @@ export default function PinjamanPage() {
 
   // Form pengajuan pinjaman
   const [loanForm, setLoanForm] = useState({
-    memberId: "M-001",
-    memberName: "Budi Santoso",
+    memberId: "",
+    produkId: "",
     loanAmount: "15000000",
     tenorMonths: "24",
     monthlyIncome: "8500000",
@@ -48,14 +49,51 @@ export default function PinjamanPage() {
     loanPurpose: "Modal Pengembangan Usaha Mikro",
   });
 
-  // Senarai kontrak pinjaman berjalan dinamis
-  const [loanList, setLoanList] = useState([
-    { id: "LOAN-001", noKontrak: "PF-2024-0001", name: "Budi Santoso", amount: 15000000, outstanding: 8500000, tenor: "24 Bulan", status: "LANCAR", riskGrade: "A", isCair: true },
-    { id: "LOAN-002", noKontrak: "PF-2024-0002", name: "Siti Aminah", amount: 5000000, outstanding: 1200000, tenor: "12 Bulan", status: "LANCAR", riskGrade: "A", isCair: true },
-    { id: "LOAN-003", noKontrak: "PF-2024-0003", name: "Ahmad Dahlan", amount: 25000000, outstanding: 25000000, tenor: "36 Bulan", status: "DPK", riskGrade: "B", isCair: true },
-    { id: "LOAN-004", noKontrak: "PF-2024-0004", name: "Dewi Lestari", amount: 10000000, outstanding: 9500000, tenor: "18 Bulan", status: "LANCAR", riskGrade: "A", isCair: true },
-    { id: "LOAN-005", noKontrak: "PF-2024-0005", name: "Rina Nose", amount: 7500000, outstanding: 7500000, tenor: "12 Bulan", status: "MACET", riskGrade: "D", isCair: true },
-  ]);
+  // Senarai opsi dari peladen
+  const [anggotaOpts, setAnggotaOpts] = React.useState<any[]>([]);
+  const [produkOpts, setProdukOpts] = React.useState<any[]>([]);
+
+  // Metrik portofolio murni
+  const [summaryMetrics, setSummaryMetrics] = React.useState({
+    totalPlafon: 0,
+    sisaOutstanding: 0,
+    nplRatio: 0,
+    dpkCount: 0,
+  });
+
+  // Senarai kontrak pinjaman berjalan riil
+  const [loanList, setLoanList] = useState<any[]>([]);
+
+  const loadDashboardData = async () => {
+    try {
+      const res = await getPinjamanDashboardDataAction();
+      if (res?.success && res.data) {
+        setLoanList(res.data.pinjamanList || []);
+        if (res.data.summary) {
+          setSummaryMetrics({
+            totalPlafon: res.data.summary.totalPlafon || 0,
+            sisaOutstanding: res.data.summary.sisaOutstanding || 0,
+            nplRatio: res.data.summary.nplRatio || 0,
+            dpkCount: res.data.summary.dpkCount || 0,
+          });
+        }
+        if (res.data.options) {
+          setAnggotaOpts(res.data.options.anggotaOptions || []);
+          setProdukOpts(res.data.options.produkOptions || []);
+          if (res.data.options.anggotaOptions?.[0]) {
+            setLoanForm(prev => ({ ...prev, memberId: res.data.options.anggotaOptions[0].id }));
+          }
+          if (res.data.options.produkOptions?.[0]) {
+            setLoanForm(prev => ({ ...prev, produkId: res.data.options.produkOptions[0].id }));
+          }
+        }
+      }
+    } catch (e) {}
+  };
+
+  React.useEffect(() => {
+    loadDashboardData();
+  }, []);
 
   const filteredList = loanList.filter(
     (item) => (selectedFilter === "SEMUA" || item.status.toUpperCase() === selectedFilter) &&
@@ -63,6 +101,10 @@ export default function PinjamanPage() {
   );
 
   const handleLiveCreditScore = async () => {
+    if (!loanForm.memberId) {
+      showModal("warning", "Pilih Debitur", "Harap pilih anggota debitur terlebih dahulu.");
+      return;
+    }
     setIsScoringLoading(true);
     setScoringResult(null);
 
@@ -83,36 +125,38 @@ export default function PinjamanPage() {
     }
   };
 
-  const handleSubmitPengajuan = () => {
+  const handleSubmitPengajuan = async () => {
     if (!scoringResult) {
       showModal("warning", "Analisis Diperlukan", "Harap lakukan analisis kelayakan (AI Credit Scoring) terlebih dahulu sebelum mengajukan persetujuan kontrak.");
       return;
     }
 
-    const newLoan = {
-      id: `LOAN-00${loanList.length + 1}`,
-      noKontrak: `PF-2026-000${loanList.length + 1}`,
-      name: loanForm.memberName,
-      amount: Number(loanForm.loanAmount) || 0,
-      outstanding: Number(loanForm.loanAmount) || 0,
-      tenor: `${loanForm.tenorMonths} Bulan`,
-      status: "LANCAR",
-      riskGrade: scoringResult.grade,
-      isCair: false, // Menunggu aksi pencairan kasir
-    };
+    if (!loanForm.produkId) {
+      showModal("warning", "Pilihan Produk", "Harap pilih produk pembiayaan yang dituju.");
+      return;
+    }
 
-    setLoanList([newLoan, ...loanList]);
-    setIsOpenModal(false);
+    const res = await createPinjamanAction({
+      anggotaId: loanForm.memberId,
+      produkId: loanForm.produkId,
+      plafon: Number(loanForm.loanAmount) || 0,
+      tenorBulan: Number(loanForm.tenorMonths) || 12,
+      aiCreditScore: scoringResult.score,
+      aiNotes: `Rekomendasi Grade ${scoringResult.grade}: ${scoringResult.recommendation}`,
+      tujuanPembiayaan: loanForm.loanPurpose,
+    });
 
-    showModal(
-      "success",
-      "Pengajuan Pembiayaan Berhasil Diajukan",
-      `Kontrak pembiayaan ${newLoan.noKontrak} atas nama ${newLoan.name} dengan plafon Rp ${newLoan.amount.toLocaleString("id-ID")} telah dikirim ke antrean dengan Risk Grade ${newLoan.riskGrade}. Sisa dana akan disalurkan saat tombol Pencairan ditekan.`
-    );
+    if (res?.success) {
+      setIsOpenModal(false);
+      await loadDashboardData();
+      showModal("success", "Pengajuan Pembiayaan Berhasil Disetujui", res.message || "Kontrak disetujui secara atomik di basis data.");
+    } else {
+      showModal("warning", "Gagal Mengajukan", res?.error || "Terjadi kesalahan saat memproses kontrak.");
+    }
   };
 
   const handleLihatJadwal = (row: any) => {
-    const angsuranPokok = Math.round(row.outstanding / parseInt(row.tenor));
+    const angsuranPokok = Math.round(row.amount / parseInt(row.tenor));
     const marginBulanan = Math.round((row.amount * 0.12) / parseInt(row.tenor));
     showModal(
       "success",
@@ -121,13 +165,14 @@ export default function PinjamanPage() {
     );
   };
 
-  const handlePencairan = (id: string) => {
-    setLoanList(prev => prev.map(item => item.id === id ? { ...item, isCair: true } : item));
-    showModal(
-      "success",
-      "Pencairan Dana Berhasil Dieksekusi",
-      "Dana pembiayaan telah berhasil dipindahbukukan ke rekening tabungan debitur bersangkutan melalui otorisasi jurnal ganda otomatis (Kredit Akun Bank/Kas, Debet Piutang Pembiayaan)."
-    );
+  const handlePencairan = async (id: string) => {
+    const res = await cairkanPinjamanAction(id);
+    if (res?.success) {
+      await loadDashboardData();
+      showModal("success", "Pencairan Dana Berhasil Dieksekusi", res.message || "Pencairan sukses dipindahbukukan.");
+    } else {
+      showModal("warning", "Pencairan Ditolak", res?.error || "Gagal mencairkan dana kontrak pembiayaan.");
+    }
   };
 
   return (
@@ -160,7 +205,7 @@ export default function PinjamanPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-lg sm:text-xl font-bold text-slate-900 font-mono">Rp 62.500.000</div>
+            <div className="text-lg sm:text-xl font-bold text-slate-900 font-mono">Rp {summaryMetrics.totalPlafon.toLocaleString("id-ID")}</div>
             <p className="text-[10px] text-slate-400 mt-1">Akumulasi kontrak berjalan</p>
           </CardContent>
         </Card>
@@ -173,7 +218,7 @@ export default function PinjamanPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-lg sm:text-xl font-bold text-slate-900 font-mono">Rp 51.700.000</div>
+            <div className="text-lg sm:text-xl font-bold text-slate-900 font-mono">Rp {summaryMetrics.sisaOutstanding.toLocaleString("id-ID")}</div>
             <p className="text-[10px] text-amber-600 font-medium mt-1">Pokok pinjaman belum lunas</p>
           </CardContent>
         </Card>
@@ -186,7 +231,7 @@ export default function PinjamanPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-lg sm:text-xl font-bold text-slate-900 font-mono">3.4%</div>
+            <div className="text-lg sm:text-xl font-bold text-slate-900 font-mono">{summaryMetrics.nplRatio}%</div>
             <p className="text-[10px] text-emerald-600 font-medium mt-1">Batas aman standar OJK (&lt;5%)</p>
           </CardContent>
         </Card>
@@ -199,7 +244,7 @@ export default function PinjamanPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-lg sm:text-xl font-bold text-slate-900 font-mono">1 Kontrak</div>
+            <div className="text-lg sm:text-xl font-bold text-slate-900 font-mono">{summaryMetrics.dpkCount} Kontrak</div>
             <p className="text-[10px] text-purple-600 font-medium mt-1">Dalam Perhatian Khusus</p>
           </CardContent>
         </Card>
@@ -344,19 +389,30 @@ export default function PinjamanPage() {
           </DialogHeader>
 
           <div className="space-y-3 py-2">
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Debitur</label>
+              <select
+                value={loanForm.memberId}
+                onChange={(e) => setLoanForm({ ...loanForm, memberId: e.target.value })}
+                className="w-full h-8 px-2 text-xs font-semibold rounded-lg border border-slate-200 focus:outline-none focus:border-blue-500 text-slate-800 bg-white"
+              >
+                {anggotaOpts.map(ang => (
+                  <option key={ang.id} value={ang.id}>{ang.namaLengkap} ({ang.nik})</option>
+                ))}
+              </select>
+            </div>
+
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Debitur</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Produk Pembiayaan</label>
                 <select
-                  value={loanForm.memberName}
-                  onChange={(e) => setLoanForm({ ...loanForm, memberName: e.target.value })}
+                  value={loanForm.produkId}
+                  onChange={(e) => setLoanForm({ ...loanForm, produkId: e.target.value })}
                   className="w-full h-8 px-2 text-xs font-semibold rounded-lg border border-slate-200 focus:outline-none focus:border-blue-500 text-slate-800 bg-white"
                 >
-                  <option value="Budi Santoso">Budi Santoso</option>
-                  <option value="Siti Aminah">Siti Aminah</option>
-                  <option value="Ahmad Dahlan">Ahmad Dahlan</option>
-                  <option value="Rina Nose">Rina Nose</option>
-                  <option value="Dewi Lestari">Dewi Lestari</option>
+                  {produkOpts.map(prd => (
+                    <option key={prd.id} value={prd.id}>{prd.namaProduk} ({Number(prd.marginBunga)}%)</option>
+                  ))}
                 </select>
               </div>
               <div>

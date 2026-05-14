@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { getSidebarStatsAction } from "@/actions/stats-action";
 import {
   LayoutDashboard,
   Users,
@@ -20,6 +21,7 @@ import {
   ChevronDown,
   ChevronRight,
   BookOpen,
+  FileSpreadsheet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -36,15 +38,23 @@ interface SidebarProps {
 export function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
   const pathname = usePathname();
 
-  const [liveIndicators] = useState({
-    simpananCount: 4,
-    pinjamanCount: 5,
+  const [liveIndicators, setLiveIndicators] = useState({
+    simpananCount: 0,
+    pinjamanCount: 0,
     auditLogCount: "Live",
-    produkCount: 8,
-    userCount: 3,
-    cabangCount: 2,
-    coaCount: 12,
+    produkCount: 0,
+    userCount: 0,
+    cabangCount: 0,
+    coaCount: 0,
   });
+
+  useEffect(() => {
+    getSidebarStatsAction().then(res => {
+      if (res?.success && res.data) {
+        setLiveIndicators(res.data as any);
+      }
+    }).catch(() => {});
+  }, [pathname]);
 
   // State untuk melacak grup mana yang dalam kondisi Expand (Terbuka) / Collapse (Tertutup)
   const [openGroups, setOpenGroups] = useState<{ [key: string]: boolean }>({
@@ -92,6 +102,11 @@ export function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
           icon: BookOpen,
           badge: liveIndicators.coaCount,
           badgeColor: "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+        },
+        {
+          name: "Jurnal Umum",
+          href: "/jurnal",
+          icon: FileSpreadsheet
         },
         {
           name: "Laporan Akuntansi & SHU",

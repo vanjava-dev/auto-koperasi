@@ -3,16 +3,18 @@
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { getCoaListAction, createCoaAction } from "@/actions/coa-action";
+import { getCoaListAction, createCoaAction, seedCoaStandarAction } from "@/actions/coa-action";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, BookOpen, Edit, Trash2, CheckCircle2, ShieldCheck, HelpCircle } from "lucide-react";
+import { Plus, BookOpen, Edit, Trash2, CheckCircle2, ShieldCheck, HelpCircle, RefreshCw, Database } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { FeedbackModal, FeedbackType } from "@/components/shared/FeedbackModal";
+import { TableEmptyState } from "@/components/shared/TableHelper";
 
 export default function CoaPage() {
   const [isOpenModal, setIsOpenModal] = useState(false);
   const [modalMode, setModalMode] = useState<"tambah" | "edit">("tambah");
+  const [isSeedLoading, setIsSeedLoading] = useState(false);
 
   // State Modal Umpan Balik
   const [modalState, setModalState] = useState<{
@@ -41,12 +43,8 @@ export default function CoaPage() {
     saldoBaku: "0",
   });
 
-  // Senarai Master CoA Baku Koperasi
-  // Senarai Master CoA Baku Koperasi
-  const [coaList, setCoaList] = useState<any[]>([
-    { id: "COA-101", kode: "101.01", nama: "Kas Tunai Teller Utama", tipe: "ASET", dk: "DEBIT", saldo: 45000000, isSystem: true },
-    { id: "COA-102", kode: "101.02", nama: "Rekening Bank Syariah Indonesia (BSI)", tipe: "ASET", dk: "DEBIT", saldo: 125000000, isSystem: true },
-  ]);
+  // Senarai Master CoA Baku Koperasi — kosong sampai data riil dimuat dari peladen
+  const [coaList, setCoaList] = useState<any[]>([]);
 
   // Muat data riil dari pangkalan data
   const loadRealCoa = async () => {
@@ -61,7 +59,7 @@ export default function CoaPage() {
             nama: item.namaAkun,
             tipe: item.tipe,
             dk: isDebit ? "DEBIT" : "KREDIT",
-            saldo: item.tipe === "ASSET" ? 45000000 : item.tipe === "LIABILITY" ? 12450000 : 5000000,
+            saldo: Number(item.saldoTerkini) || 0,
             isSystem: true,
           };
         });
@@ -75,6 +73,27 @@ export default function CoaPage() {
   useEffect(() => {
     loadRealCoa();
   }, []);
+
+  const handleSeedStandar = async () => {
+    setIsSeedLoading(true);
+    try {
+      const res = await seedCoaStandarAction();
+      if (res?.success) {
+        await loadRealCoa();
+        showModal(
+          "success",
+          "Sinkronisasi CoA Standar Berhasil",
+          res.message || `Seluruh pos akun standar PSAK Koperasi telah berhasil disinkronisasi ke dalam buku besar pangkalan data.`
+        );
+      } else {
+        showModal("warning", "Sinkronisasi Gagal", res?.error || "Gagal menyisipkan akun standar ke database.");
+      }
+    } catch (e) {
+      showModal("warning", "Kesalahan Sistem", "Tidak dapat menyelesaikan proses sinkronisasi saat ini.");
+    } finally {
+      setIsSeedLoading(false);
+    }
+  };
 
   const handleBukaTambah = () => {
     setModalMode("tambah");
@@ -134,7 +153,7 @@ export default function CoaPage() {
         nama: formCoa.namaAkun,
         tipe: formCoa.klasifikasi,
         dk: formCoa.sifatNormal,
-        saldo: Number(formCoa.saldoBaku) || c.saldo,
+        saldo: c.saldo,
       } : c));
 
       setIsOpenModal(false);
@@ -169,13 +188,28 @@ export default function CoaPage() {
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Manajemen Buku Besar / CoA</h1>
           <p className="text-xs text-slate-500 mt-0.5">Pengaturan katalog akun master akuntansi berstandar penjurnal ganda (Double-Entry Guard).</p>
         </div>
-        <Button
-          size="sm"
-          onClick={handleBukaTambah}
-          className="bg-blue-600 hover:bg-blue-700 text-xs text-white h-9 shadow-md"
-        >
-          <Plus className="w-4 h-4 mr-1.5" /> Tambah Akun CoA
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSeedStandar}
+            disabled={isSeedLoading}
+            className="text-xs h-9 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+          >
+            {isSeedLoading
+              ? <RefreshCw className="w-4 h-4 mr-1.5 animate-spin" />
+              : <Database className="w-4 h-4 mr-1.5" />
+            }
+            {isSeedLoading ? "Menyinkronkan..." : "Sinkronisasi CoA Standar PSAK"}
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleBukaTambah}
+            className="bg-blue-600 hover:bg-blue-700 text-xs text-white h-9 shadow-md"
+          >
+            <Plus className="w-4 h-4 mr-1.5" /> Tambah Akun CoA
+          </Button>
+        </div>
       </div>
 
       {/* ── Tabel Daftar CoA ── */}
@@ -203,63 +237,70 @@ export default function CoaPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {coaList.map((row) => (
-                <TableRow key={row.id} className="hover:bg-slate-50/50">
-                  <TableCell className="pl-6 font-mono text-xs font-bold text-blue-600">
-                    {row.kode}
-                  </TableCell>
-                  <TableCell className="text-xs font-bold text-slate-900">
-                    {row.nama}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <span className={`px-2 py-0.5 rounded font-bold text-[9px] ${
-                      row.tipe === "ASET" ? "bg-emerald-100 text-emerald-800" :
-                      row.tipe === "LIABILITY" ? "bg-amber-100 text-amber-800" :
-                      row.tipe === "EQUITY" ? "bg-purple-100 text-purple-800" :
-                      row.tipe === "REVENUE" ? "bg-blue-100 text-blue-800" : "bg-rose-100 text-rose-800"
-                    }`}>
-                      {row.tipe}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <span className={`text-[10px] font-mono font-bold ${
-                      row.dk === "DEBIT" ? "text-emerald-600" : "text-purple-600"
-                    }`}>
-                      {row.dk}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-xs font-bold text-slate-900">
-                    Rp {row.saldo.toLocaleString("id-ID")}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    {row.isSystem ? (
-                      <Badge variant="secondary" className="text-[8px] bg-slate-100 text-slate-500 font-sans font-bold py-0">Core</Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-[8px] border-dashed border-slate-200 text-slate-400 font-sans py-0">Kustom</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right pr-6 space-x-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleBukaEdit(row)}
-                      title="Sunting Parameter Akun"
-                      className="w-7 h-7 text-slate-400 hover:text-blue-600 hover:bg-blue-50"
-                    >
-                      <Edit className="w-3.5 h-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleHapusCoa(row.id, row.nama, row.isSystem)}
-                      title="Hapus Akun CoA"
-                      className="w-7 h-7 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {coaList.length === 0 ? (
+                <TableEmptyState
+                  colSpan={7}
+                  message="Belum ada akun CoA terdaftar. Klik tombol Sinkronisasi CoA Standar PSAK untuk mengisi otomatis 35 pos akun standar koperasi."
+                />
+              ) : (
+                coaList.map((row) => (
+                  <TableRow key={row.id} className="hover:bg-slate-50/50">
+                    <TableCell className="pl-6 font-mono text-xs font-bold text-blue-600">
+                      {row.kode}
+                    </TableCell>
+                    <TableCell className="text-xs font-bold text-slate-900">
+                      {row.nama}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <span className={`px-2 py-0.5 rounded font-bold text-[9px] ${
+                        row.tipe === "ASSET"   ? "bg-emerald-100 text-emerald-800" :
+                        row.tipe === "LIABILITY" ? "bg-amber-100 text-amber-800" :
+                        row.tipe === "EQUITY"  ? "bg-purple-100 text-purple-800" :
+                        row.tipe === "REVENUE" ? "bg-blue-100 text-blue-800" : "bg-rose-100 text-rose-800"
+                      }`}>
+                        {row.tipe}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <span className={`text-[10px] font-mono font-bold ${
+                        row.dk === "DEBIT" ? "text-emerald-600" : "text-purple-600"
+                      }`}>
+                        {row.dk}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-xs font-bold text-slate-900">
+                      Rp {row.saldo.toLocaleString("id-ID")}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {row.isSystem ? (
+                        <Badge variant="secondary" className="text-[8px] bg-slate-100 text-slate-500 font-sans font-bold py-0">Core</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[8px] border-dashed border-slate-200 text-slate-400 font-sans py-0">Kustom</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right pr-6 space-x-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleBukaEdit(row)}
+                        title="Sunting Parameter Akun"
+                        className="w-7 h-7 text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                      >
+                        <Edit className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleHapusCoa(row.id, row.nama, row.isSystem)}
+                        title="Hapus Akun CoA"
+                        className="w-7 h-7 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
@@ -325,15 +366,6 @@ export default function CoaPage() {
                   <option value="KREDIT">KREDIT (+) Bertambah</option>
                 </select>
               </div>
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Saldo Awal Simulasi (Rp)</label>
-              <input
-                type="text"
-                value={formCoa.saldoBaku}
-                onChange={(e) => setFormCoa({ ...formCoa, saldoBaku: e.target.value })}
-                className="w-full h-8 px-3 text-xs font-mono rounded-lg border border-slate-200 text-slate-900"
-              />
             </div>
           </div>
 

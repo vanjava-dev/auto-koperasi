@@ -90,6 +90,7 @@ model Koperasi {
   produkPinjaman ProdukPinjaman[]
   coas           ChartOfAccount[]
   jurnals        Jurnal[]
+  kategoriTx     KategoriTransaksi[]
 
   @@map("koperasi")
 }
@@ -117,6 +118,7 @@ model Anggota {
   id             String        @id @default(uuid())
   koperasiId     String
   nik            String        @unique
+  cif            String?       @unique
   namaLengkap    String
   alamat         String?
   tempatLahir    String?
@@ -274,6 +276,7 @@ model ChartOfAccount {
   jurnalEntries  JurnalEntry[]
   produkSimpanan ProdukSimpanan[]
   produkPinjaman ProdukPinjaman[] @relation("CoaPiutangProduk")
+  kategoriTx     KategoriTransaksi[]
 
   @@unique([koperasiId, kodeAkun])
   @@map("chart_of_accounts")
@@ -354,5 +357,26 @@ model RiwayatShu {
 
   @@unique([koperasiId, tahunBuku])
   @@map("riwayat_shu")
+}
+
+// ─── 8. ENTITAS KATEGORI TRANSAKSI OPERASIONAL (KUSTOMISASI COA) ───
+
+model KategoriTransaksi {
+  id          String         @id @default(uuid())
+  koperasiId  String
+  kode        String         // Format unik misal: "OP-LISTRIK", "OP-ATK"
+  nama        String         // "Tagihan Listrik, Air, & Internet"
+  jenis       String         // "MASUK" | "KELUAR"
+  deskripsi   String?
+  coaId       String         // Terhubung ke pos CoA lawan yang diatur oleh Admin/Manajer
+  isActive    Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  koperasi    Koperasi       @relation(fields: [koperasiId], references: [id], onDelete: Cascade)
+  coa         ChartOfAccount @relation(fields: [coaId], references: [id])
+
+  @@unique([koperasiId, kode])
+  @@map("kategori_transaksi")
 }
 

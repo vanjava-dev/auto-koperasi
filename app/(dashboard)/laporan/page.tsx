@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { FileDown, FileSpreadsheet, Layers, BookOpen, TrendingUp, CheckCircle2, FileText, ArrowRight, RefreshCw, Send } from "lucide-react";
 import { FeedbackModal, FeedbackType } from "@/components/shared/FeedbackModal";
-import { hitungShuBerjalanAction, distribusikanShuAction } from "@/actions/shu-action";
+import { TableEmptyState } from "@/components/shared/TableHelper";
+import { hitungShuBerjalanAction, distribusikanShuAction, getLaporanCoaListAction } from "@/actions/shu-action";
 
 export default function LaporanPage() {
   const [activeTab, setActiveTab] = useState<"neraca" | "labarugi" | "bukubesar">("neraca");
@@ -22,11 +23,14 @@ export default function LaporanPage() {
   }>({
     id: "",
     tahunBuku: new Date().getFullYear(),
-    totalPendapatan: 15700000,
-    totalBeban: 4600000,
-    shuBersih: 11100000,
+    totalPendapatan: 0,
+    totalBeban: 0,
+    shuBersih: 0,
     statusDistribusi: "DRAF",
   });
+
+  const [coaList, setCoaList] = useState<any[]>([]);
+  const [isCoaLoading, setIsCoaLoading] = useState(false);
 
   // State Feedback Modal
   const [modalState, setModalState] = useState<{
@@ -62,28 +66,46 @@ export default function LaporanPage() {
         setShuData({
           id: res.data.id,
           tahunBuku: res.data.tahunBuku,
-          totalPendapatan: Number(res.data.totalPendapatan),
-          totalBeban: Number(res.data.totalBeban),
-          shuBersih: Number(res.data.shuBersih),
-          statusDistribusi: res.data.statusDistribusi,
+          totalPendapatan: Number(res.data.totalPendapatan) || 0,
+          totalBeban: Number(res.data.totalBeban) || 0,
+          shuBersih: Number(res.data.shuBersih) || 0,
+          statusDistribusi: res.data.statusDistribusi || "DRAF",
         });
       }
     } catch (e) {
-      // Abaikan jika database kosong
     } finally {
       setIsCalculatingShu(false);
     }
   };
 
+  const loadCoaData = async () => {
+    setIsCoaLoading(true);
+    try {
+      const res = await getLaporanCoaListAction();
+      if (res?.success && res.data) {
+        setCoaList(res.data);
+      }
+    } catch (e) {} finally {
+      setIsCoaLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadShuData();
+    loadCoaData();
+  }, []);
+
   useEffect(() => {
     if (activeTab === "labarugi") {
       loadShuData();
+    } else if (activeTab === "bukubesar") {
+      loadCoaData();
     }
   }, [activeTab]);
 
   const handleDistributeShu = async () => {
-    if (!shuData.id) {
-      showModal("warning", "Kalkulasi Diperlukan", "Harap lakukan penghitungan ulang laba rugi SHU terlebih dahulu sebelum mengeksekusi pembagian dana.");
+    if (!shuData.id || shuData.id === "shu-zero") {
+      showModal("warning", "Kalkulasi Diperlukan", "Harap lakukan penghitungan laba rugi riil yang memiliki saldo sebelum mengeksekusi pembagian dana.");
       return;
     }
 
@@ -107,18 +129,20 @@ export default function LaporanPage() {
     }
   };
 
-  // Data CoA / Buku Besar tiruan/persisten
-  const coaList = [
-    { kode: "1.1.1.01", nama: "Kas Teller Utama", tipe: "Aset Lancar", saldo: 45000000, dk: "Debit" },
-    { kode: "1.1.2.01", nama: "Bank Syariah Indonesia (BSI)", tipe: "Aset Lancar", saldo: 125000000, dk: "Debit" },
-    { kode: "1.1.3.01", nama: "Piutang Pembiayaan Anggota", tipe: "Aset Lancar", saldo: 51700000, dk: "Debit" },
-    { kode: "2.1.1.01", nama: "Simpanan Sukarela Anggota", tipe: "Kewajiban Pendek", saldo: 12450000, dk: "Kredit" },
-    { kode: "2.1.2.01", nama: "Simpanan Berjangka (Deposito)", tipe: "Kewajiban Pendek", saldo: 45000000, dk: "Kredit" },
-    { kode: "3.1.1.01", nama: "Modal Simpanan Pokok", tipe: "Ekuitas", saldo: 6250000, dk: "Kredit" },
-    { kode: "3.1.2.01", nama: "Modal Simpanan Wajib", tipe: "Ekuitas", saldo: 18350000, dk: "Kredit" },
-    { kode: "4.1.1.01", nama: "Pendapatan Margin Pembiayaan", tipe: "Pendapatan", saldo: 14200000, dk: "Kredit" },
-    { kode: "5.1.1.01", nama: "Beban Bagi Hasil Simpanan", tipe: "Beban", saldo: 3100000, dk: "Debit" },
-  ];
+  // Pemisahan pos akun dinamis dari pangkalan data riil
+  const asetList = coaList.filter((c) => c.tipe === "ASSET");
+  const totalAset = asetList.reduce((acc, c) => acc + Number(c.saldo || 0), 0);
+
+  const kewajibanList = coaList.filter((c) => c.tipe === "LIABILITY");
+  const ekuitasList = coaList.filter((c) => c.tipe === "EQUITY");
+  const totalKewajiban = kewajibanList.reduce((acc, c) => acc + Number(c.saldo || 0), 0);
+  const totalEkuitas = ekuitasList.reduce((acc, c) => acc + Number(c.saldo || 0), 0);
+  // Total Pasiva = Kewajiban + Ekuitas
+  const totalPasiva = totalKewajiban + totalEkuitas;
+  const selisihNeraca = Math.abs(totalAset - totalPasiva);
+
+  const pendapatanList = coaList.filter((c) => c.tipe === "REVENUE");
+  const bebanList = coaList.filter((c) => c.tipe === "EXPENSE");
 
   return (
     <div className="space-y-6">
@@ -214,36 +238,22 @@ export default function LaporanPage() {
             </CardHeader>
             <CardContent className="p-4 space-y-4">
               <div className="space-y-2">
-                <span className="text-[10px] font-bold text-slate-400 uppercase">Aset Lancar</span>
-                <div className="flex justify-between items-center text-xs pb-1 border-b border-slate-100">
-                  <span className="text-slate-600">Kas Tunai Teller</span>
-                  <span className="font-mono font-medium text-slate-900">Rp 45.000.000</span>
-                </div>
-                <div className="flex justify-between items-center text-xs pb-1 border-b border-slate-100">
-                  <span className="text-slate-600">Rekening Bank BSI</span>
-                  <span className="font-mono font-medium text-slate-900">Rp 125.000.000</span>
-                </div>
-                <div className="flex justify-between items-center text-xs pb-1 border-b border-slate-100">
-                  <span className="text-slate-600">Piutang Pembiayaan Bersih</span>
-                  <span className="font-mono font-medium text-slate-900">Rp 51.700.000</span>
-                </div>
-              </div>
-
-              <div className="space-y-2 pt-2">
-                <span className="text-[10px] font-bold text-slate-400 uppercase">Aset Tetap</span>
-                <div className="flex justify-between items-center text-xs pb-1 border-b border-slate-100">
-                  <span className="text-slate-600">Inventaris Kantor & Sistem</span>
-                  <span className="font-mono font-medium text-slate-900">Rp 25.000.000</span>
-                </div>
-                <div className="flex justify-between items-center text-xs pb-1 border-b border-slate-100">
-                  <span className="text-slate-400 italic">Akumulasi Penyusutan</span>
-                  <span className="font-mono text-rose-500">(Rp 5.000.000)</span>
-                </div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Rincian Pos Aset</span>
+                {asetList.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic">Belum ada pos aset riil terdaftar.</p>
+                ) : (
+                  asetList.map((item) => (
+                    <div key={item.kode} className="flex justify-between items-center text-xs pb-1 border-b border-slate-100">
+                      <span className="text-slate-600">{item.nama}</span>
+                      <span className="font-mono font-medium text-slate-900">Rp {(item.saldo || 0).toLocaleString("id-ID")}</span>
+                    </div>
+                  ))
+                )}
               </div>
 
               <div className="pt-4 border-t-2 border-slate-900 flex justify-between items-center text-xs font-bold">
                 <span className="text-slate-900 uppercase">Total Aset</span>
-                <span className="font-mono text-sm text-blue-600">Rp 241.700.000</span>
+                <span className="font-mono text-sm text-blue-600">Rp {totalAset.toLocaleString("id-ID")}</span>
               </div>
             </CardContent>
           </Card>
@@ -258,40 +268,38 @@ export default function LaporanPage() {
             </CardHeader>
             <CardContent className="p-4 space-y-4">
               <div className="space-y-2">
-                <span className="text-[10px] font-bold text-slate-400 uppercase">Kewajiban Jangka Pendek</span>
-                <div className="flex justify-between items-center text-xs pb-1 border-b border-slate-100">
-                  <span className="text-slate-600">Simpanan Sukarela Anggota</span>
-                  <span className="font-mono font-medium text-slate-900">Rp 12.450.000</span>
-                </div>
-                <div className="flex justify-between items-center text-xs pb-1 border-b border-slate-100">
-                  <span className="text-slate-600">Deposito Berjangka</span>
-                  <span className="font-mono font-medium text-slate-900">Rp 45.000.000</span>
-                </div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Kewajiban (Liabilitas)</span>
+                {kewajibanList.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic">Belum ada pos kewajiban riil terdaftar.</p>
+                ) : (
+                  kewajibanList.map((item) => (
+                    <div key={item.kode} className="flex justify-between items-center text-xs pb-1 border-b border-slate-100">
+                      <span className="text-slate-600">{item.nama}</span>
+                      <span className="font-mono font-medium text-slate-900">Rp {(item.saldo || 0).toLocaleString("id-ID")}</span>
+                    </div>
+                  ))
+                )}
               </div>
 
               <div className="space-y-2 pt-2">
                 <span className="text-[10px] font-bold text-slate-400 uppercase">Ekuitas Permodalan</span>
-                <div className="flex justify-between items-center text-xs pb-1 border-b border-slate-100">
-                  <span className="text-slate-600">Modal Simpanan Pokok</span>
-                  <span className="font-mono font-medium text-slate-900">Rp 6.250.000</span>
-                </div>
-                <div className="flex justify-between items-center text-xs pb-1 border-b border-slate-100">
-                  <span className="text-slate-600">Modal Simpanan Wajib</span>
-                  <span className="font-mono font-medium text-slate-900">Rp 18.350.000</span>
-                </div>
-                <div className="flex justify-between items-center text-xs pb-1 border-b border-slate-100">
-                  <span className="text-slate-600">Cadangan Koperasi & Aset</span>
-                  <span className="font-mono font-medium text-slate-900">Rp 148.550.000</span>
-                </div>
-                <div className="flex justify-between items-center text-xs pb-1 border-b border-slate-100">
-                  <span className="text-slate-600">SHU Berjalan</span>
-                  <span className="font-mono font-medium text-emerald-600">Rp {shuData.shuBersih.toLocaleString("id-ID")}</span>
-                </div>
+                {ekuitasList.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic">Belum ada pos ekuitas riil terdaftar.</p>
+                ) : (
+                  ekuitasList.map((item) => (
+                    <div key={item.kode} className="flex justify-between items-center text-xs pb-1 border-b border-slate-100">
+                      <span className="text-slate-600">{item.nama}</span>
+                      <span className={`font-mono font-medium ${item.kode.includes("301.06") ? "text-emerald-600" : "text-slate-900"}`}>
+                        Rp {(item.saldo || 0).toLocaleString("id-ID")}
+                      </span>
+                    </div>
+                  ))
+                )}
               </div>
 
               <div className="pt-4 border-t-2 border-slate-900 flex justify-between items-center text-xs font-bold">
                 <span className="text-slate-900 uppercase">Total Kewajiban & Ekuitas</span>
-                <span className="font-mono text-sm text-emerald-600">Rp 241.700.000</span>
+                <span className="font-mono text-sm text-emerald-600">Rp {totalPasiva.toLocaleString("id-ID")}</span>
               </div>
             </CardContent>
           </Card>
@@ -299,7 +307,7 @@ export default function LaporanPage() {
           <div className="col-span-1 md:col-span-2 p-3 bg-slate-50 rounded-xl flex items-center justify-center gap-2 border border-slate-100">
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
             <span className="text-xs font-bold text-slate-700">Status Neraca: SEIMBANG (Balanced)</span>
-            <span className="text-[10px] text-slate-400 font-mono">| Selisih: Rp 0</span>
+            <span className="text-[10px] text-slate-400 font-mono">| Selisih: Rp {selisihNeraca.toLocaleString("id-ID")}</span>
           </div>
         </div>
       )}
@@ -338,14 +346,16 @@ export default function LaporanPage() {
             <div>
               <span className="text-xs font-bold text-slate-800 uppercase block mb-2">A. Pendapatan Operasional</span>
               <div className="space-y-1.5 pl-3 border-l-2 border-emerald-500">
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-600">Pendapatan Margin & Jasa Pembiayaan (Jurnal Master)</span>
-                  <span className="font-mono text-slate-900 font-medium">Rp {(shuData.totalPendapatan - 1500000).toLocaleString("id-ID")}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-600">Pendapatan Administrasi Pendaftaran</span>
-                  <span className="font-mono text-slate-900 font-medium">Rp 1.500.000</span>
-                </div>
+                {pendapatanList.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic">Belum ada pos pendapatan tercatat.</p>
+                ) : (
+                  pendapatanList.map((item) => (
+                    <div key={item.kode} className="flex justify-between text-xs pb-1 border-b border-slate-100">
+                      <span className="text-slate-600">{item.nama}</span>
+                      <span className="font-mono text-slate-900 font-medium">Rp {(item.saldo || 0).toLocaleString("id-ID")}</span>
+                    </div>
+                  ))
+                )}
                 <div className="flex justify-between text-xs font-bold pt-1 border-t border-slate-100">
                   <span className="text-slate-800">Total Pendapatan</span>
                   <span className="font-mono text-emerald-600">Rp {shuData.totalPendapatan.toLocaleString("id-ID")}</span>
@@ -357,14 +367,16 @@ export default function LaporanPage() {
             <div>
               <span className="text-xs font-bold text-slate-800 uppercase block mb-2">B. Beban Operasional</span>
               <div className="space-y-1.5 pl-3 border-l-2 border-rose-500">
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-600">Beban Imbal Jasa / Bunga Simpanan</span>
-                  <span className="font-mono text-slate-900 font-medium">Rp {(shuData.totalBeban - 1500000).toLocaleString("id-ID")}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-600">Beban Layanan Server & Operasional</span>
-                  <span className="font-mono text-slate-900 font-medium">Rp 1.500.000</span>
-                </div>
+                {bebanList.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic">Belum ada pos beban tercatat.</p>
+                ) : (
+                  bebanList.map((item) => (
+                    <div key={item.kode} className="flex justify-between text-xs pb-1 border-b border-slate-100">
+                      <span className="text-slate-600">{item.nama}</span>
+                      <span className="font-mono text-slate-900 font-medium">Rp {(item.saldo || 0).toLocaleString("id-ID")}</span>
+                    </div>
+                  ))
+                )}
                 <div className="flex justify-between text-xs font-bold pt-1 border-t border-slate-100">
                   <span className="text-slate-800">Total Beban</span>
                   <span className="font-mono text-rose-600">Rp {shuData.totalBeban.toLocaleString("id-ID")}</span>
@@ -419,31 +431,35 @@ export default function LaporanPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {coaList.map((row) => (
-                  <TableRow key={row.kode} className="hover:bg-slate-50/50">
-                    <TableCell className="pl-6 font-mono text-xs font-bold text-blue-600">
-                      {row.kode}
-                    </TableCell>
-                    <TableCell className="text-xs font-medium text-slate-900">
-                      {row.nama}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <span className="text-[10px] bg-slate-50 px-2 py-0.5 rounded text-slate-600 font-medium">
-                        {row.tipe}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <span className={`text-[10px] font-bold ${
-                        row.dk === "Debit" ? "text-emerald-600" : "text-purple-600"
-                      }`}>
-                        {row.dk}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-xs font-bold text-slate-900 pr-6">
-                      Rp {row.saldo.toLocaleString("id-ID")}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {coaList.length === 0 ? (
+                  <TableEmptyState colSpan={5} message="Belum ada akun master (Chart of Accounts) yang terdaftar pada pembukuan koperasi." />
+                ) : (
+                  coaList.map((row) => (
+                    <TableRow key={row.kode} className="hover:bg-slate-50/50">
+                      <TableCell className="pl-6 font-mono text-xs font-bold text-blue-600">
+                        {row.kode}
+                      </TableCell>
+                      <TableCell className="text-xs font-medium text-slate-900">
+                        {row.nama}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <span className="text-[10px] bg-slate-50 px-2 py-0.5 rounded text-slate-600 font-medium">
+                          {row.tipe}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <span className={`text-[10px] font-bold ${
+                          row.dk === "Debit" ? "text-emerald-600" : "text-purple-600"
+                        }`}>
+                          {row.dk}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-xs font-bold text-slate-900 pr-6">
+                        Rp {row.saldo.toLocaleString("id-ID")}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </CardContent>

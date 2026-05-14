@@ -170,6 +170,104 @@ export async function POST(request: Request) {
           },
         });
 
+      } else if (prefix === "AKT") {
+        // ── C. PEMROSESAN AKTIVASI ANGGOTA BARU ──────────────────────
+        const anggota = await tx.anggota.findUniqueOrThrow({
+          where: { id: targetId },
+          include: {
+            rekeningSimpanan: {
+              where: { status: "MENUNGGU" },
+              include: { produk: true },
+            },
+          },
+        });
+
+        if (anggota.status === "AKTIF") {
+           throw new Error("Anggota sudah aktif.");
+        }
+
+        const coaKasBank = await tx.chartOfAccount.findFirst({
+          where: { kodeAkun: "101.02", koperasiId: anggota.koperasiId },
+        });
+
+        let sisaPembayaran = nominalPaid;
+        const mutasiPromises = [];
+        const jurnalEntries = [];
+
+        if (coaKasBank) {
+          jurnalEntries.push({ coaId: coaKasBank.id, debit: nominalPaid, kredit: 0 });
+        }
+
+        // Distribusi dana ke Pokok dan Wajib
+        for (const rek of anggota.rekeningSimpanan) {
+          if (!rek.produk) continue;
+          const wajibBayar = Number(rek.produk.setoranAwalMin);
+          
+          if (wajibBayar > 0 && sisaPembayaran >= wajibBayar) {
+            sisaPembayaran -= wajibBayar;
+            
+            // Update rekening
+            await tx.rekeningSimpanan.update({
+              where: { id: rek.id },
+              data: { saldo: wajibBayar, status: "AKTIF" },
+            });
+
+            // Buat Mutasi
+            await tx.mutasiSimpanan.create({
+              data: {
+                rekeningId: rek.id,
+                jenis: JenisMutasi.SETORAN,
+                nominal: wajibBayar,
+                saldoSetelah: wajibBayar,
+                keterangan: `Setoran Aktivasi via Xendit (${payload.payment_channel || "VA/QRIS"})`,
+              },
+            });
+
+            // Siapkan jurnal kredit
+            if (rek.produk.coaId) {
+              jurnalEntries.push({ coaId: rek.produk.coaId, debit: 0, kredit: wajibBayar });
+            }
+          }
+        }
+
+        // Aktifkan anggota
+        await tx.anggota.update({
+          where: { id: anggota.id },
+          data: { status: "AKTIF" },
+        });
+
+        // Catat Jurnal
+        if (coaKasBank && jurnalEntries.length > 1) {
+          const noRef = `JRN-AKT-${Date.now().toString().slice(-6)}`;
+          await tx.jurnal.create({
+            data: {
+              koperasiId: anggota.koperasiId,
+              noReferensi: noRef,
+              keterangan: `Aktivasi Keanggotaan ${anggota.namaLengkap} via Xendit`,
+              source: "WEBHOOK",
+              entries: {
+                create: jurnalEntries,
+              },
+            },
+          });
+        }
+
+        // Audit Log
+        await tx.auditLog.create({
+          data: {
+            userId: null,
+            source: "WEBHOOK",
+            action: "WEBHOOK_AKTIVASI_ANGGOTA",
+            entityType: "ANGGOTA",
+            entityId: externalId,
+            details: JSON.stringify({
+              anggotaId: targetId,
+              nominalPaid,
+              statusBaru: "AKTIF",
+            }),
+          },
+        });
+
       } else {
         throw new Error(`Prefix transaksi '${prefix}' tidak didukung sistem.`);
       }

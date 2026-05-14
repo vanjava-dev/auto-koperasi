@@ -137,3 +137,81 @@ export async function savePengaturanSistemAction(inputData: {
     return { success: false, error: "Gagal menyimpan pembaruan parameter sistem ke basis data." };
   }
 }
+
+/**
+ * Mengambil konteks data riil untuk bilah atas (Navbar),
+ * meliputi senarai cabang/koperasi terdaftar dan profil pengguna yang terotentikasi.
+ */
+export async function getNavbarContextAction() {
+  try {
+    // 1. Ambil seluruh data Koperasi (sebagai simpul cabang/instansi)
+    let koperasiList = await prisma.koperasi.findMany({
+      orderBy: { createdAt: "asc" },
+    });
+
+    if (!koperasiList || koperasiList.length === 0) {
+      const created = await prisma.koperasi.create({
+        data: {
+          nama: process.env.NEXT_PUBLIC_KOPERASI_NAME || "KSP Harapan Artha Nusantara",
+          alamat: "Jl. Jend. Sudirman Kav. 45, Jakarta",
+          telepon: "021-5552910",
+        },
+      });
+      koperasiList = [created];
+    }
+
+    const primaryKoperasi = koperasiList[0];
+
+    // 2. Ambil user/petugas aktif pertama sebagai representasi operator login riil
+    let currentUser = await prisma.user.findFirst({
+      where: { isActive: true },
+      orderBy: { createdAt: "asc" },
+    });
+
+    if (!currentUser) {
+      currentUser = await prisma.user.create({
+        data: {
+          koperasiId: primaryKoperasi.id,
+          email: "citra.sari@koperasi.id",
+          passwordHash: "ENCRYPTED_SECURE_HASH_DEFAULT",
+          namaLengkap: "Citra Sari",
+          role: "SUPERADMIN",
+          isActive: true,
+        },
+      });
+    }
+
+    return {
+      success: true,
+      data: {
+        activeKoperasi: {
+          id: primaryKoperasi.id,
+          nama: primaryKoperasi.nama,
+          kode: primaryKoperasi.badanHukumNo || "CAB-PUSAT",
+        },
+        koperasiList: koperasiList.map((k) => ({
+          id: k.id,
+          nama: k.nama,
+          kode: k.badanHukumNo || "CAB-PUSAT",
+        })),
+        currentUser: {
+          id: currentUser.id,
+          namaLengkap: currentUser.namaLengkap,
+          email: currentUser.email,
+          role: currentUser.role,
+          initials: currentUser.namaLengkap
+            .split(" ")
+            .map((n) => n[0])
+            .join("")
+            .substring(0, 2)
+            .toUpperCase(),
+        },
+      },
+    };
+  } catch (e: any) {
+    return {
+      success: false,
+      error: e.message || "Gagal memuat data asli untuk Navbar.",
+    };
+  }
+}

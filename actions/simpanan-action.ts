@@ -27,84 +27,10 @@ export async function getSimpananDashboardDataAction() {
       orderBy: { createdAt: "desc" },
     });
 
-    // 2. Jika kosong, buatkan rekening contoh persisten
+    // 2. Logika seeder otomatis dinonaktifkan sesuai SOP (Pure Pristine State)
+    // Nasabah / sistem wajib membuka tabungan baru secara sadar melalui antarmuka
     if (rekeningList.length === 0) {
-      // Ambil anggota pertama
-      const anggota = await prisma.anggota.findFirst({
-        where: { koperasiId: koperasi.id },
-      });
-
-      if (anggota) {
-        // Cari produk simpanan sukarela
-        let prdSukarela = await prisma.produkSimpanan.findFirst({
-          where: { koperasiId: koperasi.id, jenis: JenisSimpanan.SUKARELA },
-        });
-
-        if (!prdSukarela) {
-          const coaLiab = await prisma.chartOfAccount.findFirst({
-            where: { koperasiId: koperasi.id, tipe: "LIABILITY" },
-          });
-          if (coaLiab) {
-            prdSukarela = await prisma.produkSimpanan.create({
-              data: {
-                koperasiId: koperasi.id,
-                namaProduk: "Simpanan Sukarela Fleksibel",
-                jenis: JenisSimpanan.SUKARELA,
-                setoranAwalMin: 100000,
-                saldoMin: 50000,
-                coaId: coaLiab.id,
-                isActive: true,
-              },
-            });
-          }
-        }
-
-        if (prdSukarela) {
-          await prisma.$transaction(async (tx) => {
-            const rek = await tx.rekeningSimpanan.create({
-              data: {
-                noRekening: `REK-SK-${anggota.nik.slice(-6)}`,
-                anggotaId: anggota.id,
-                produkId: prdSukarela!.id,
-                saldo: 4500000,
-                status: "AKTIF",
-              },
-            });
-
-            await tx.mutasiSimpanan.create({
-              data: {
-                rekeningId: rek.id,
-                jenis: JenisMutasi.SETORAN,
-                nominal: 4500000,
-                saldoSetelah: 4500000,
-                keterangan: "Setoran awal pembukaan rekening sukarela AI seeder",
-              },
-            });
-
-            await tx.auditLog.create({
-              data: {
-                userId: null,
-                source: "AI_AGENT",
-                action: "SEED_REKENING_SIMPANAN",
-                entityType: "REKENING",
-                entityId: rek.id,
-                details: "Injeksi otomatis rekening simpanan sukarela pertama berhasil disisipkan.",
-              },
-            });
-          });
-
-          // Muat ulang
-          rekeningList = await prisma.rekeningSimpanan.findMany({
-            where: { anggota: { koperasiId: koperasi.id } },
-            include: {
-              anggota: true,
-              produk: true,
-              mutasi: { orderBy: { createdAt: "desc" }, take: 1 },
-            },
-            orderBy: { createdAt: "desc" },
-          });
-        }
-      }
+      // Tidak melakukan penyisipan baris dummy
     }
 
     // 3. Hitung ringkasan saldo berdasarkan jenis produk
@@ -136,7 +62,34 @@ export async function getSimpananDashboardDataAction() {
     return {
       success: true,
       data: {
-        rekeningList,
+        rekeningList: rekeningList.map((r: any) => ({
+          ...r,
+          saldo: Number(r.saldo),
+          createdAt: r.createdAt?.toISOString(),
+          updatedAt: r.updatedAt?.toISOString(),
+          anggota: r.anggota ? {
+            ...r.anggota,
+            createdAt: r.anggota.createdAt?.toISOString(),
+            updatedAt: r.anggota.updatedAt?.toISOString(),
+            tanggalLahir: r.anggota.tanggalLahir?.toISOString(),
+          } : null,
+          produk: r.produk ? {
+            ...r.produk,
+            nisbahBagiHasil: Number(r.produk.nisbahBagiHasil),
+            setoranAwalMin: Number(r.produk.setoranAwalMin),
+            saldoMin: Number(r.produk.saldoMin),
+            createdAt: r.produk.createdAt?.toISOString(),
+            updatedAt: r.produk.updatedAt?.toISOString(),
+          } : null,
+          mutasi: r.mutasi?.map((m: any) => ({
+            ...m,
+            nominal: Number(m.nominal || 0),
+            saldoSetelah: Number(m.saldoSetelah || 0),
+            jumlah: Number(m.jumlah || m.nominal || 0),
+            saldoAkhir: Number(m.saldoAkhir || m.saldoSetelah || 0),
+            createdAt: m.createdAt?.toISOString(),
+          })) || [],
+        })),
         summary: { totalSukarela, totalWajib, totalDeposito, totalPokok },
         options: { anggotaOptions, produkOptions },
       },
@@ -183,7 +136,7 @@ export async function createRekeningSimpananAction(inputData: {
         },
       });
 
-      // 2. Jika ada setoran awal, sisipkan mutasi
+      // 2. Jika ada setoran awal, sisipkan mutasi dan jurnal ganda SSOT
       if (inputData.setoranAwal > 0) {
         await tx.mutasiSimpanan.create({
           data: {
@@ -194,6 +147,31 @@ export async function createRekeningSimpananAction(inputData: {
             keterangan: `Setoran awal pembukaan rekening ${prd.namaProduk}`,
           },
         });
+
+        // Cari akun Kas Teller utama sebagai penampung debit kas
+        const coaKas = await tx.chartOfAccount.findFirst({
+          where: { koperasiId: prd.koperasiId, kodeAkun: { startsWith: "101" } },
+        });
+
+        if (coaKas && prd.coaId) {
+          const d = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+          const noRef = `JRN-${d}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+          await tx.jurnal.create({
+            data: {
+              koperasiId: prd.koperasiId,
+              noReferensi: noRef,
+              keterangan: `Setoran awal pembukaan rekening ${noRek} atas nama ${ang.namaLengkap}`,
+              source: "PORTFOLIO_AKTIVASI",
+              entries: {
+                create: [
+                  { coaId: coaKas.id, debit: inputData.setoranAwal, kredit: 0 },
+                  { coaId: prd.coaId, debit: 0, kredit: inputData.setoranAwal },
+                ],
+              },
+            },
+          });
+        }
       }
 
       await tx.auditLog.create({
@@ -263,6 +241,37 @@ export async function createMutasiSimpananAction(inputData: {
           keterangan: `Transaksi ${inputData.jenis === "SETORAN" ? "Setoran Tunai" : "Penarikan Dana"} melalui konter teller`,
         },
       });
+
+      // Cari akun Kas Teller utama
+      const coaKas = await tx.chartOfAccount.findFirst({
+        where: { koperasiId: rek.produk?.koperasiId || "KOP-MASTER", kodeAkun: { startsWith: "101" } },
+      });
+
+      if (coaKas && rek.produk?.coaId) {
+        const d = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+        const noRef = `JRN-${d}-${Math.floor(1000 + Math.random() * 9000)}`;
+        const isSetor = inputData.jenis === "SETORAN";
+
+        await tx.jurnal.create({
+          data: {
+            koperasiId: rek.produk.koperasiId,
+            noReferensi: noRef,
+            keterangan: `Mutasi ${inputData.jenis} portofolio rekening ${rek.noRekening}`,
+            source: "PORTFOLIO_MUTASI",
+            entries: {
+              create: isSetor
+                ? [
+                    { coaId: coaKas.id, debit: inputData.nominal, kredit: 0 },
+                    { coaId: rek.produk.coaId, debit: 0, kredit: inputData.nominal },
+                  ]
+                : [
+                    { coaId: rek.produk.coaId, debit: inputData.nominal, kredit: 0 },
+                    { coaId: coaKas.id, debit: 0, kredit: inputData.nominal },
+                  ],
+            },
+          },
+        });
+      }
 
       // 3. Stempel audit trail
       await tx.auditLog.create({

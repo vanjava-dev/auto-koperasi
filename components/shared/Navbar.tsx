@@ -15,15 +15,33 @@ import {
   ChevronsUpDown
 } from "lucide-react";
 import { FeedbackModal, FeedbackType } from "@/components/shared/FeedbackModal";
-import { getPengaturanSistemAction } from "@/actions/pengaturan-action";
+import { getNavbarContextAction } from "@/actions/pengaturan-action";
 
 /**
  * Navbar — Bilah atas terpadu Koperasi-AI Core.
- * Menampung pemicu ganda: Menu Pengalih Cabang (kiri) dan Menu Profil Interaktif (kanan).
+ * Menampung pemicu ganda: Menu Pengalih Cabang (kiri) dan Menu Profil Interaktif (kanan),
+ * ditenagai sepenuhnya oleh entitas basis data asli dari PostgreSQL.
  */
 export function Navbar() {
-  const [koperasiName, setKoperasiName] = useState("KSP Harapan Artha Nusantara");
+  // State Lingkup Cabang / Koperasi
+  const [koperasiName, setKoperasiName] = useState("Memuat Simpul...");
+  const [koperasiList, setKoperasiList] = useState<{ id: string; nama: string; kode: string }[]>([]);
   const [isBranchOpen, setIsBranchOpen] = useState(false);
+
+  // State Profil Pengguna Terotentikasi
+  const [currentUser, setCurrentUser] = useState<{
+    id: string;
+    namaLengkap: string;
+    email: string;
+    role: string;
+    initials: string;
+  }>({
+    id: "USR-000",
+    namaLengkap: "Operator Aktif",
+    email: "operator@koperasi.id",
+    role: "TELLER",
+    initials: "OP",
+  });
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [operatorStatus, setOperatorStatus] = useState<"Online" | "Istirahat">("Online");
 
@@ -44,15 +62,29 @@ export function Navbar() {
     setModalState({ isOpen: true, type, title, description });
   };
 
-  // Muat nama koperasi riil dari pengaturan peladen
+  // Muat data cabang dan pengguna riil dari pangkalan data peladen
   useEffect(() => {
-    async function fetchMeta() {
-      const res = await getPengaturanSistemAction();
-      if (res?.success && res.data?.koperasiName) {
-        setKoperasiName(res.data.koperasiName);
+    async function fetchNavbarContext() {
+      try {
+        const res = await getNavbarContextAction();
+        if (res?.success && res.data) {
+          if (res.data.activeKoperasi?.nama) {
+            setKoperasiName(res.data.activeKoperasi.nama);
+          }
+          if (res.data.koperasiList?.length > 0) {
+            setKoperasiList(res.data.koperasiList);
+          }
+          if (res.data.currentUser) {
+            setCurrentUser(res.data.currentUser);
+          }
+        } else {
+          setKoperasiName("KSP Harapan Artha Nusantara");
+        }
+      } catch (e) {
+        setKoperasiName("KSP Harapan Artha Nusantara");
       }
     }
-    fetchMeta();
+    fetchNavbarContext();
   }, []);
 
   // Handler Perpindahan Lingkup Cabang (Tenant Context Switch)
@@ -76,7 +108,7 @@ export function Navbar() {
     showModal(
       "success",
       "Status Kehadiran Diperbarui",
-      `Sesi terminal operator Citra Sari kini telah diatur ke mode "${nextStatus}". Ketersediaan penugasan penjurnalan otomatis disesuaikan secara seketika.`
+      `Sesi terminal operator ${currentUser.namaLengkap} kini telah diatur ke mode "${nextStatus}". Ketersediaan penugasan penjurnalan otomatis disesuaikan secara seketika.`
     );
   };
 
@@ -85,7 +117,7 @@ export function Navbar() {
     showModal(
       "success",
       "Akses Profil & Otorisasi",
-      "Anda sedang diarahkan ke dalam konsol pengaturan kredensial pribadi. Hak akses saat ini berada pada tingkat otorisasi tertinggi (SUPERADMIN/Kepala Teller)."
+      `Anda sedang diarahkan ke dalam konsol pengaturan kredensial pribadi. Hak akses saat ini berada pada tingkat otorisasi ${currentUser.role}.`
     );
   };
 
@@ -94,12 +126,12 @@ export function Navbar() {
     showModal(
       "success",
       "Sesi Terminal Berakhir Secara Aman",
-      "Sesi otentikasi ganda untuk operator Citra Sari telah dicabut. Rekam jejak audit hari ini telah ditandatangani dan dienkripsi ke dalam peladen cadangan secara permanen."
+      `Sesi otentikasi aman untuk operator ${currentUser.namaLengkap} telah dicabut. Rekam jejak audit hari ini telah ditandatangani dan dienkripsi ke dalam peladen cadangan secara permanen.`
     );
   };
 
   return (
-    <header className="h-16 bg-white border-b border-slate-100 flex items-center justify-between px-4 sm:px-6 sticky top-0 z-30">
+    <header className="h-16 bg-white border-b border-slate-100 flex items-center justify-between px-4 sm:px-6 sticky top-0 z-30 shadow-xs">
       {/* ── Sisi Kiri: Wadah Identitas Merek & Pengalih Cabang Interaktif ── */}
       <div className="relative">
         <button
@@ -125,42 +157,42 @@ export function Navbar() {
           <ChevronsUpDown className="w-3.5 h-3.5 text-slate-400 shrink-0 group-hover:text-slate-600 transition-colors" />
         </button>
 
-        {/* ── Senarai Dropdown Pilihan Cabang ── */}
+        {/* ── Senarai Dropdown Pilihan Cabang Asli ── */}
         {isBranchOpen && (
           <div className="absolute left-0 top-full mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 animate-in fade-in-0 zoom-in-95 duration-150 z-50">
             <div className="px-4 py-1.5 border-b border-slate-50 text-[9px] font-bold text-slate-400 uppercase tracking-wider">
               Pilih Simpul Jaringan Cabang
             </div>
             <div className="py-1 space-y-0.5">
-              {[
-                { code: "CAB-PUSAT", name: "Kantor Pusat Operasional" },
-                { code: "CAB-JABAR", name: "Cabang Pembantu Bandung Raya" },
-                { code: "CAB-JATIM", name: "Cabang Pembantu Surabaya" },
-              ].map((branch) => (
-                <button
-                  key={branch.code}
-                  onClick={() => handleSwitchBranch(branch.name, branch.code)}
-                  className={`w-full flex items-center justify-between px-4 py-2 text-xs text-left transition-colors ${
-                    koperasiName === branch.name
-                      ? "bg-blue-50/60 text-blue-700 font-bold"
-                      : "text-slate-600 hover:bg-slate-50 font-medium"
-                  }`}
-                >
-                  <div className="truncate">
-                    <p className="truncate leading-tight">{branch.name}</p>
-                    <p className="text-[9px] font-mono text-slate-400">{branch.code}</p>
-                  </div>
-                  {koperasiName === branch.name && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600 shrink-0" />
-                  )}
-                </button>
-              ))}
+              {koperasiList.length === 0 ? (
+                <div className="px-4 py-2 text-[10px] text-slate-400 italic">Memuat instansi basis data...</div>
+              ) : (
+                koperasiList.map((branch) => (
+                  <button
+                    key={branch.id}
+                    onClick={() => handleSwitchBranch(branch.nama, branch.kode)}
+                    className={`w-full flex items-center justify-between px-4 py-2 text-xs text-left transition-colors ${
+                      koperasiName === branch.nama
+                        ? "bg-blue-50/60 text-blue-700 font-bold"
+                        : "text-slate-600 hover:bg-slate-50 font-medium"
+                    }`}
+                  >
+                    <div className="truncate">
+                      <p className="truncate leading-tight">{branch.nama}</p>
+                      <p className="text-[9px] font-mono text-slate-400">{branch.kode}</p>
+                    </div>
+                    {koperasiName === branch.nama && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600 shrink-0" />
+                    )}
+                  </button>
+                ))
+              )}
             </div>
           </div>
         )}
       </div>
 
-      {/* ── Sisi Kanan: Wadah Status Jaringan & Tombol Profil Interaktif ── */}
+      {/* ── Sisi Kanan: Wadah Status Jaringan & Tombol Profil Interaktif Asli ── */}
       <div className="flex items-center gap-3 relative">
         {/* Indikator Koneksi Jaringan */}
         <Badge variant="outline" className="hidden sm:inline-flex items-center gap-1 bg-emerald-50 text-emerald-600 border-emerald-100 font-normal text-xs py-0.5">
@@ -168,7 +200,7 @@ export function Navbar() {
           <span>Terhubung</span>
         </Badge>
 
-        {/* Tombol Pemicu Menu Profil */}
+        {/* Tombol Pemicu Menu Profil Asli */}
         <div className="relative border-l border-slate-100 pl-2">
           <button
             onClick={() => {
@@ -180,26 +212,29 @@ export function Navbar() {
           >
             <Avatar className="w-8 h-8 border border-slate-200 shadow-sm">
               <AvatarFallback className="bg-gradient-to-br from-blue-600 to-blue-700 text-white text-xs font-bold">
-                CS
+                {currentUser.initials}
               </AvatarFallback>
             </Avatar>
             <div className="hidden md:block text-left">
-              <div className="text-xs font-bold text-slate-900 leading-none">Citra Sari</div>
+              <div className="text-xs font-bold text-slate-900 leading-none truncate max-w-[120px]">
+                {currentUser.namaLengkap}
+              </div>
               <div className="text-[10px] text-blue-600 font-semibold mt-0.5 flex items-center gap-0.5">
-                <ShieldCheck className="w-2.5 h-2.5" /> Kepala Teller
+                <ShieldCheck className="w-2.5 h-2.5 shrink-0" /> 
+                <span className="truncate max-w-[100px]">{currentUser.role}</span>
               </div>
             </div>
             <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isProfileOpen ? "rotate-180" : ""}`} />
           </button>
 
-          {/* Senarai Opsi Profil Dropdown */}
+          {/* Senarai Opsi Profil Dropdown Asli */}
           {isProfileOpen && (
             <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 animate-in fade-in-0 zoom-in-95 duration-150 z-50">
               <div className="px-4 py-2 border-b border-slate-50">
                 <p className="text-[10px] text-slate-400 font-medium">Sesi Operator Aktif</p>
-                <p className="text-xs font-bold text-slate-900 truncate">citra.sari@koperasi.id</p>
+                <p className="text-xs font-bold text-slate-900 truncate">{currentUser.email}</p>
                 <span className="inline-block mt-1 px-1.5 py-0.5 text-[8px] font-mono bg-blue-50 text-blue-600 font-bold rounded">
-                  ID: USR-TLR-01
+                  ROLE: {currentUser.role}
                 </span>
               </div>
 

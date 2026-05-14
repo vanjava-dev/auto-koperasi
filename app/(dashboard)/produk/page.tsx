@@ -3,7 +3,15 @@
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { getProdukListAction, createProdukSimpananAction, createProdukPinjamanAction } from "@/actions/produk-action";
+import { 
+  getProdukListAction, 
+  createProdukSimpananAction, 
+  createProdukPinjamanAction,
+  updateProdukSimpananAction,
+  updateProdukPinjamanAction,
+  deleteProdukSimpananAction,
+  deleteProdukPinjamanAction
+} from "@/actions/produk-action";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Package, Percent, Edit, Trash2, Eye, Layers } from "lucide-react";
@@ -47,15 +55,11 @@ export default function ProdukPage() {
     keterangan: "",
   });
 
-  // Senarai Produk Simpanan
-  const [simpananProducts, setSimpananProducts] = useState<any[]>([
-    { id: "PRD-S01", kode: "SUKARELA", nama: "Simpanan Sukarela Fleksibel", tipe: "Sukarela", bunga: 4.5, minAwal: 50000, status: "AKTIF", coaName: "201.01 - Simpanan Sukarela" },
-  ]);
+  // Senarai Produk Simpanan diawali kosong murni tanpa sampel statis
+  const [simpananProducts, setSimpananProducts] = useState<any[]>([]);
 
-  // Senarai Produk Pembiayaan
-  const [pembiayaanProducts, setPembiayaanProducts] = useState<any[]>([
-    { id: "PRD-P01", kode: "PEM-MIKRO", nama: "Pembiayaan Mikro Mandiri", margin: 12.0, maxPlafon: 25000000, tenorMax: "24 Bulan", status: "AKTIF", coaName: "101.03 - Piutang Pembiayaan" },
-  ]);
+  // Senarai Produk Pembiayaan diawali kosong murni tanpa sampel statis
+  const [pembiayaanProducts, setPembiayaanProducts] = useState<any[]>([]);
 
   const [realCoasList, setRealCoasList] = useState<any[]>([]);
 
@@ -201,43 +205,55 @@ export default function ProdukPage() {
         }
       }
     } else {
-      // Alur Eksekusi Penyuntingan (Edit Mode)
+      // Alur Eksekusi Penyuntingan (Edit Mode) ke PostgreSQL Nyata
       if (activeTab === "simpanan") {
-        setSimpananProducts(prev => prev.map(p => p.id === selectedId ? {
-          ...p,
-          kode: formProduk.kode.toUpperCase(),
-          nama: formProduk.nama,
-          tipe: formProduk.keterangan || p.tipe,
-          bunga: Number(formProduk.bungaAtauMargin) || p.bunga,
-          minAwal: Number(formProduk.minimalAwal) || p.minAwal,
-        } : p));
+        const res = await updateProdukSimpananAction(selectedId, {
+          namaProduk: formProduk.nama,
+          nisbahBagiHasil: Number(formProduk.bungaAtauMargin) || 0,
+          setoranAwalMin: Number(formProduk.minimalAwal) || 0,
+        });
+        if (res?.success) {
+          setIsOpenModal(false);
+          showModal("success", "Pembaruan Berhasil", `Produk simpanan "${formProduk.nama}" berhasil diperbarui di basis data PostgreSQL.`);
+          loadRealProducts();
+        } else {
+          showModal("warning", "Gagal Memperbarui", res?.error || "Terjadi kendala saat memperbarui basis data.");
+        }
       } else {
-        setPembiayaanProducts(prev => prev.map(p => p.id === selectedId ? {
-          ...p,
-          kode: formProduk.kode.toUpperCase(),
-          nama: formProduk.nama,
-          margin: Number(formProduk.bungaAtauMargin) || p.margin,
-          maxPlafon: Number(formProduk.minimalAwal) || p.maxPlafon,
-          tenorMax: formProduk.keterangan || p.tenorMax,
-        } : p));
+        const res = await updateProdukPinjamanAction(selectedId, {
+          namaProduk: formProduk.nama,
+          marginBunga: Number(formProduk.bungaAtauMargin) || 0,
+          plafonMax: Number(formProduk.minimalAwal) || 0,
+        });
+        if (res?.success) {
+          setIsOpenModal(false);
+          showModal("success", "Pembaruan Berhasil", `Paket pembiayaan "${formProduk.nama}" berhasil diperbarui di basis data PostgreSQL.`);
+          loadRealProducts();
+        } else {
+          showModal("warning", "Gagal Memperbarui", res?.error || "Terjadi kendala saat memperbarui basis data.");
+        }
       }
-
-      setIsOpenModal(false);
-      showModal(
-        "success",
-        "Pembaruan Portofolio Berhasil",
-        `Parameter redaksi dan ketentuan finansial pada paket "${formProduk.nama}" telah berhasil diperbarui ke dalam simpul utama.`
-      );
     }
   };
 
-  const handleHapusProduk = (id: string, nama: string) => {
+  const handleHapusProduk = async (id: string, nama: string) => {
     if (activeTab === "simpanan") {
-      setSimpananProducts(prev => prev.filter(p => p.id !== id));
+      const res = await deleteProdukSimpananAction(id);
+      if (res?.success) {
+        showModal("success", "Produk Dihapus", `Katalog produk simpanan "${nama}" berhasil dihapus permanen dari PostgreSQL.`);
+        loadRealProducts();
+      } else {
+        showModal("warning", "Gagal Menghapus", res?.error || "Produk tidak dapat dihapus karena memiliki keterkaitan data.");
+      }
     } else {
-      setPembiayaanProducts(prev => prev.filter(p => p.id !== id));
+      const res = await deleteProdukPinjamanAction(id);
+      if (res?.success) {
+        showModal("success", "Produk Dihapus", `Katalog paket pembiayaan "${nama}" berhasil dihapus permanen dari PostgreSQL.`);
+        loadRealProducts();
+      } else {
+        showModal("warning", "Gagal Menghapus", res?.error || "Paket tidak dapat dihapus karena memiliki keterkaitan data.");
+      }
     }
-    showModal("success", "Produk Diarsipkan", `Katalog produk "${nama}" berhasil dinonaktifkan dari penawaran sistem.`);
   };
 
   return (

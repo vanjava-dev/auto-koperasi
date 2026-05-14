@@ -23,9 +23,11 @@ import {
 } from "lucide-react";
 import { FeedbackModal, FeedbackType } from "@/components/shared/FeedbackModal";
 import { getPengaturanSistemAction } from "@/actions/pengaturan-action";
-import { hitungShuBerjalanAction } from "@/actions/shu-action";
+import { hitungShuBerjalanAction, getDashboardMetricsAction, triggerCronAutomationAction } from "@/actions/shu-action";
+import { useRouter } from "next/navigation";
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
     type: FeedbackType;
@@ -42,29 +44,34 @@ export default function DashboardPage() {
     setModalState({ isOpen: true, type, title, description });
   };
 
-  // State agregasi dinamis peladen
+  // State agregasi murni produksi
   const [stats, setStats] = useState({
-    totalAset: 1450200000,
-    totalSimpanan: 820500000,
-    pembiayaanBerjalan: 530000000,
-    anggotaCount: 154,
+    totalAset: 0,
+    totalSimpanan: 0,
+    pembiayaanBerjalan: 0,
+    anggotaCount: 0,
     shuBersih: 0,
   });
+
+  const [recentTransactionsFeed, setRecentTransactionsFeed] = useState<any[]>([]);
 
   useEffect(() => {
     async function loadServerAggregates() {
       try {
-        const resShu = await hitungShuBerjalanAction();
-        if (resShu?.success && resShu.data) {
-          setStats(prev => ({
-            ...prev,
-            shuBersih: Number(resShu.data.shuBersih),
-            totalAset: prev.totalAset + Number(resShu.data.shuBersih),
-          }));
+        const res = await getDashboardMetricsAction();
+        if (res?.success && res.data) {
+          setStats({
+            totalAset: res.data.totalAset || 0,
+            totalSimpanan: res.data.totalSimpanan || 0,
+            pembiayaanBerjalan: res.data.pembiayaanBerjalan || 0,
+            anggotaCount: res.data.anggotaCount || 0,
+            shuBersih: res.data.shuBersih || 0,
+          });
+          if (res.data.recentTransactions) {
+            setRecentTransactionsFeed(res.data.recentTransactions);
+          }
         }
-      } catch (e) {
-        // Biarkan fallback berkinerja tinggi
-      }
+      } catch (e) {}
     }
     loadServerAggregates();
   }, []);
@@ -73,45 +80,46 @@ export default function DashboardPage() {
   const [isTriggeringJob, setIsTriggeringJob] = useState<string | null>(null);
   const [jobResultMsg, setJobResultMsg] = useState<string | null>(null);
 
-  const handleTriggerBackgroundJob = (jobName: string, label: string) => {
+  const handleTriggerBackgroundJob = async (jobName: string, label: string) => {
     setIsTriggeringJob(jobName);
     setJobResultMsg(null);
 
-    // Eksekusi penembakan Cron Job yang menghasilkan pencatatan atomik riil
-    setTimeout(() => {
-      setIsTriggeringJob(null);
-      setJobResultMsg(`[Sukses] Tugas "${label}" berhasil dipicu secara terisolasi. Log audit terenkripsi disisipkan.`);
+    // Pemanggilan langsung ke aksi peladen nyata untuk merubah kolektibilitas, bunga, atau notifikasi WA
+    const res = await triggerCronAutomationAction(jobName as any);
+    setIsTriggeringJob(null);
+
+    if (res?.success) {
+      setJobResultMsg(`[Sukses] Tugas "${label}" dieksekusi nyata pada DB. ${res.message}`);
       showModal(
         "success",
-        "Otomasi Cron Berhasil Dipicu",
-        `Subsistem cerdas telah menyelesaikan tugas latar belakang "${label}" tanpa memblokir perutean utama antarmuka Anda.`
+        "Otomasi Berhasil Dijalankan",
+        `Subsistem peladen telah menyelesaikan tugas latar belakang "${label}" secara nyata yang terdaftar pada rekam jejak AuditLog.`
       );
-    }, 1200);
+      // Muat ulang metrik
+      const fresh = await getDashboardMetricsAction();
+      if (fresh?.success && fresh.data) {
+        setStats({
+          totalAset: fresh.data.totalAset || 0,
+          totalSimpanan: fresh.data.totalSimpanan || 0,
+          pembiayaanBerjalan: fresh.data.pembiayaanBerjalan || 0,
+          anggotaCount: fresh.data.anggotaCount || 0,
+          shuBersih: fresh.data.shuBersih || 0,
+        });
+      }
+    } else {
+      showModal("error", "Otomasi Gagal", res?.error || "Gagal menjalankan tugas latar belakang.");
+    }
   };
 
   const handleBukaKasir = () => {
-    showModal(
-      "success",
-      "Sesi Teller Diaktifkan",
-      "Sesi laci kasir harian telah berhasil dibuka dengan otorisasi tanda tangan atomik. Terminal pembayaran siap memproses setoran tunai, transfer bank, maupun kode bayar instan QRIS."
-    );
+    // Pengalihan seketika ke halaman terminal Teller operasional
+    router.push("/teller");
   };
 
   const handleUnduhLaporan = () => {
-    showModal(
-      "success",
-      "Unduh Laporan Ikhtisar Selesai",
-      "Dokumen PDF Ikhtisar Keuangan Berjalan beserta lampiran riwayat mutasi kasir telah berhasil dienkripsi dan diunduh ke ruang penyimpanan lokal perangkat Anda."
-    );
+    // Memicu cetak dokumen nyata atau pengalihan ke ikhtisar lengkap
+    window.print();
   };
-
-  const recentTransactions = [
-    { id: "TRX-001", name: "Budi Santoso", type: "Simpanan Wajib", amount: 100000, date: "12 Mei 2026", status: "success" },
-    { id: "TRX-002", name: "Siti Aminah", type: "Angsuran Pinjaman", amount: 850000, date: "12 Mei 2026", status: "success" },
-    { id: "TRX-003", name: "Ahmad Dahlan", type: "Penarikan Sukarela", amount: -500000, date: "11 Mei 2026", status: "warning" },
-    { id: "TRX-004", name: "Rina Nose", type: "Simpanan Pokok", amount: 500000, date: "10 Mei 2026", status: "success" },
-    { id: "TRX-005", name: "Dewi Lestari", type: "Pencairan Pinjaman", amount: -5000000, date: "09 Mei 2026", status: "warning" },
-  ];
 
   return (
     <div className="space-y-6">
@@ -343,30 +351,38 @@ export default function DashboardPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {recentTransactions.map((row) => (
-                <TableRow key={row.id} className="hover:bg-slate-50/50 transition-colors">
-                  <TableCell className="pl-6 font-mono text-xs font-bold text-blue-600">
-                    {row.id}
-                  </TableCell>
-                  <TableCell className="text-xs font-semibold text-slate-900">
-                    {row.name}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="text-[10px] font-medium py-0.5 px-2 bg-slate-50 border-slate-200 text-slate-700">
-                      {row.type}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-xs text-slate-500 font-medium">
-                    {row.date}
-                  </TableCell>
-                  <TableCell className="pr-6 text-right font-mono text-xs font-bold">
-                    <span className={row.amount > 0 ? "text-emerald-600" : "text-rose-600"}>
-                      {row.amount > 0 ? "+" : ""}
-                      Rp {Math.abs(row.amount).toLocaleString("id-ID")}
-                    </span>
+              {recentTransactionsFeed.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-8 text-xs text-slate-400 font-medium">
+                    Belum terdapat pencatatan mutasi transaksi pada pangkalan data.
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                recentTransactionsFeed.map((row) => (
+                  <TableRow key={row.id} className="hover:bg-slate-50/50 transition-colors">
+                    <TableCell className="pl-6 font-mono text-xs font-bold text-blue-600">
+                      {row.id}
+                    </TableCell>
+                    <TableCell className="text-xs font-semibold text-slate-900">
+                      {row.name}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-[10px] font-medium py-0.5 px-2 bg-slate-50 border-slate-200 text-slate-700">
+                        {row.type}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-xs text-slate-500 font-medium">
+                      {row.date}
+                    </TableCell>
+                    <TableCell className="pr-6 text-right font-mono text-xs font-bold">
+                      <span className={row.amount > 0 ? "text-emerald-600" : "text-rose-600"}>
+                        {row.amount > 0 ? "+" : ""}
+                        Rp {Math.abs(row.amount).toLocaleString("id-ID")}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>

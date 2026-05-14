@@ -128,9 +128,39 @@ export async function getProdukListAction() {
     return {
       success: true,
       data: {
-        simpanan: simpananList,
-        pinjaman: pinjamanList,
-        coas: coaList,
+        simpanan: simpananList.map((item: any) => ({
+          ...item,
+          nisbahBagiHasil: Number(item.nisbahBagiHasil),
+          setoranAwalMin: Number(item.setoranAwalMin),
+          saldoMin: Number(item.saldoMin),
+          createdAt: item.createdAt?.toISOString() || null,
+          updatedAt: item.updatedAt?.toISOString() || null,
+          coa: item.coa ? {
+            ...item.coa,
+            saldoSekarang: Number(item.coa.saldoSekarang || 0),
+            createdAt: item.coa.createdAt?.toISOString() || null,
+            updatedAt: item.coa.updatedAt?.toISOString() || null,
+          } : null,
+        })),
+        pinjaman: pinjamanList.map((item: any) => ({
+          ...item,
+          marginBunga: Number(item.marginBunga),
+          plafonMax: Number(item.plafonMax),
+          createdAt: item.createdAt?.toISOString() || null,
+          updatedAt: item.updatedAt?.toISOString() || null,
+          coaPiutang: item.coaPiutang ? {
+            ...item.coaPiutang,
+            saldoSekarang: Number(item.coaPiutang.saldoSekarang || 0),
+            createdAt: item.coaPiutang.createdAt?.toISOString() || null,
+            updatedAt: item.coaPiutang.updatedAt?.toISOString() || null,
+          } : null,
+        })),
+        coas: coaList.map((item: any) => ({
+          ...item,
+          saldoSekarang: Number(item.saldoSekarang || 0),
+          createdAt: item.createdAt?.toISOString() || null,
+          updatedAt: item.updatedAt?.toISOString() || null,
+        })),
       },
     };
   } catch (e: any) {
@@ -231,5 +261,83 @@ export async function createProdukPinjamanAction(inputData: {
   } catch (e: any) {
     console.error("[CREATE_PRODUK_PINJAMAN_ERROR]", e);
     return { success: false, error: "Gagal menyimpan produk pembiayaan ke basis data." };
+  }
+}
+
+/**
+ * Memperbarui data portofolio Produk Simpanan riil di PostgreSQL.
+ */
+export async function updateProdukSimpananAction(id: string, inputData: {
+  namaProduk: string;
+  nisbahBagiHasil: number;
+  setoranAwalMin: number;
+}) {
+  try {
+    await prisma.produkSimpanan.update({
+      where: { id },
+      data: {
+        namaProduk: inputData.namaProduk.trim(),
+        nisbahBagiHasil: inputData.nisbahBagiHasil,
+        setoranAwalMin: inputData.setoranAwalMin,
+      },
+    });
+    revalidatePath("/dashboard/produk");
+    return { success: true };
+  } catch (e: any) {
+    console.error("[UPDATE_PRODUK_SIMPANAN_ERROR]", e);
+    return { success: false, error: "Gagal memperbarui parameter produk simpanan." };
+  }
+}
+
+/**
+ * Memperbarui data portofolio Produk Pembiayaan riil di PostgreSQL.
+ */
+export async function updateProdukPinjamanAction(id: string, inputData: {
+  namaProduk: string;
+  marginBunga: number;
+  plafonMax: number;
+}) {
+  try {
+    await prisma.produkPinjaman.update({
+      where: { id },
+      data: {
+        namaProduk: inputData.namaProduk.trim(),
+        marginBunga: inputData.marginBunga,
+        plafonMax: inputData.plafonMax,
+      },
+    });
+    revalidatePath("/dashboard/produk");
+    return { success: true };
+  } catch (e: any) {
+    console.error("[UPDATE_PRODUK_PINJAMAN_ERROR]", e);
+    return { success: false, error: "Gagal memperbarui parameter produk pembiayaan." };
+  }
+}
+
+/**
+ * Menghapus/Mengarsipkan Produk Simpanan dari PostgreSQL.
+ */
+export async function deleteProdukSimpananAction(id: string) {
+  try {
+    await prisma.produkSimpanan.delete({ where: { id } });
+    revalidatePath("/dashboard/produk");
+    return { success: true };
+  } catch (e: any) {
+    console.error("[DELETE_PRODUK_SIMPANAN_ERROR]", e);
+    return { success: false, error: "Gagal menghapus produk simpanan (mungkin masih terikat dengan rekening aktif)." };
+  }
+}
+
+/**
+ * Menghapus/Mengarsipkan Produk Pembiayaan dari PostgreSQL.
+ */
+export async function deleteProdukPinjamanAction(id: string) {
+  try {
+    await prisma.produkPinjaman.delete({ where: { id } });
+    revalidatePath("/dashboard/produk");
+    return { success: true };
+  } catch (e: any) {
+    console.error("[DELETE_PRODUK_PINJAMAN_ERROR]", e);
+    return { success: false, error: "Gagal menghapus produk pembiayaan (mungkin masih terikat dengan pinjaman aktif)." };
   }
 }
